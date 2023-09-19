@@ -2616,8 +2616,8 @@ class WidgetAnnotation extends Annotation {
    */
   _hasSignatureContent(fieldValue) {
     return fieldValue instanceof Dict ?
-        fieldValue.get('ByteRange')
-        && fieldValue.get('Contents') : false;
+        Boolean(fieldValue.get('ByteRange'))
+        && Boolean(fieldValue.get('Contents')) : false;
   }
 }
 
