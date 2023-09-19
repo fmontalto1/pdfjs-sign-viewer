@@ -268,10 +268,6 @@ describe("api", function () {
     });
 
     it("creates pdf doc from non-existent URL", async function () {
-      if (!isNodeJS) {
-        // Re-enable in https://github.com/mozilla/pdf.js/issues/13061.
-        pending("Fails intermittently on Linux in browsers.");
-      }
       const loadingTask = getDocument(
         buildGetDocumentParams("non-existent.pdf")
       );
@@ -2037,6 +2033,7 @@ describe("api", function () {
       const value = "Hello World";
 
       pdfDoc.annotationStorage.setValue("2055R", { value });
+      pdfDoc.annotationStorage.setValue("2090R", { value });
 
       const data = await pdfDoc.saveDocument();
       await loadingTask.destroy();
@@ -2050,6 +2047,17 @@ describe("api", function () {
         "xfa:data.PPTC_153.Page1.PersonalInformation.TitleAndNameInformation.PersonalInfo.Surname.#text"
       );
       expect(surName.nodeValue).toEqual(value);
+
+      // The path for the date is:
+      // PPTC_153[0].Page1[0].DeclerationAndSignatures[0]
+      //            .#subform[2].currentDate[0]
+      // and it contains a class (i.e. #subform[2]) which is irrelevant in the
+      // context of datasets (it's more a template concept).
+      const date = getNamedNodeInXML(
+        datasets.node,
+        "xfa:data.PPTC_153.Page1.DeclerationAndSignatures.currentDate.#text"
+      );
+      expect(date.nodeValue).toEqual(value);
 
       await loadingTask.destroy();
     });
@@ -2285,6 +2293,114 @@ describe("api", function () {
           expect(opList.argsArray[i][0]).toEqual("img_p0_1");
         }
       }
+
+      await loadingTask.destroy();
+    });
+
+    it("write a new stamp annotation in a tagged pdf, save and check that the structure tree", async function () {
+      if (isNodeJS) {
+        pending("Cannot create a bitmap from Node.js.");
+      }
+
+      const TEST_IMAGES_PATH = "../images/";
+      const filename = "firefox_logo.png";
+      const path = new URL(TEST_IMAGES_PATH + filename, window.location).href;
+
+      const response = await fetch(path);
+      const blob = await response.blob();
+      const bitmap = await createImageBitmap(blob);
+
+      let loadingTask = getDocument(buildGetDocumentParams("bug1823296.pdf"));
+      let pdfDoc = await loadingTask.promise;
+      pdfDoc.annotationStorage.setValue("pdfjs_internal_editor_0", {
+        annotationType: AnnotationEditorType.STAMP,
+        rect: [128, 400, 148, 420],
+        rotation: 0,
+        bitmap,
+        bitmapId: "im1",
+        pageIndex: 0,
+        structTreeParentId: "p3R_mc12",
+        accessibilityData: {
+          type: "Figure",
+          alt: "Hello World",
+        },
+      });
+
+      const data = await pdfDoc.saveDocument();
+      await loadingTask.destroy();
+
+      loadingTask = getDocument(data);
+      pdfDoc = await loadingTask.promise;
+      const page = await pdfDoc.getPage(1);
+      const tree = await page.getStructTree();
+      const leaf = tree.children[0].children[6].children[1];
+
+      expect(leaf).toEqual({
+        role: "Figure",
+        children: [
+          {
+            type: "annotation",
+            id: "pdfjs_internal_id_477R",
+          },
+        ],
+        alt: "Hello World",
+      });
+
+      await loadingTask.destroy();
+    });
+
+    it("write a new stamp annotation in a non-tagged pdf, save and check that the structure tree", async function () {
+      if (isNodeJS) {
+        pending("Cannot create a bitmap from Node.js.");
+      }
+
+      const TEST_IMAGES_PATH = "../images/";
+      const filename = "firefox_logo.png";
+      const path = new URL(TEST_IMAGES_PATH + filename, window.location).href;
+
+      const response = await fetch(path);
+      const blob = await response.blob();
+      const bitmap = await createImageBitmap(blob);
+
+      let loadingTask = getDocument(buildGetDocumentParams("empty.pdf"));
+      let pdfDoc = await loadingTask.promise;
+      pdfDoc.annotationStorage.setValue("pdfjs_internal_editor_0", {
+        annotationType: AnnotationEditorType.STAMP,
+        rect: [128, 400, 148, 420],
+        rotation: 0,
+        bitmap,
+        bitmapId: "im1",
+        pageIndex: 0,
+        structTreeParentId: null,
+        accessibilityData: {
+          type: "Figure",
+          alt: "Hello World",
+        },
+      });
+
+      const data = await pdfDoc.saveDocument();
+      await loadingTask.destroy();
+
+      loadingTask = getDocument(data);
+      pdfDoc = await loadingTask.promise;
+      const page = await pdfDoc.getPage(1);
+      const tree = await page.getStructTree();
+
+      expect(tree).toEqual({
+        children: [
+          {
+            role: "Figure",
+            children: [
+              {
+                type: "annotation",
+                id: "pdfjs_internal_id_18R",
+              },
+            ],
+            alt: "Hello World",
+          },
+        ],
+        role: "Root",
+      });
 
       await loadingTask.destroy();
     });

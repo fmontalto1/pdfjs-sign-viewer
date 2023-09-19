@@ -34,6 +34,8 @@ import { FeatureTest, shadow, unreachable } from "../../shared/util.js";
  * Base class for editors.
  */
 class AnnotationEditor {
+  #altTextButton = null;
+
   #keepAspectRatio = false;
 
   #resizersDiv = null;
@@ -54,13 +56,21 @@ class AnnotationEditor {
 
   _focusEventsAllowed = true;
 
+  _l10nPromise = null;
+
   #isDraggable = false;
 
   #zIndex = AnnotationEditor._zIndex++;
 
+  static _borderLineWidth = -1;
+
   static _colorManager = new ColorManager();
 
   static _zIndex = 1;
+
+  // When one of the dimensions of an editor is smaller than this value, the
+  // button to edit the alt text is visually moved outside of the editor.
+  static SMALL_EDITOR_SIZE = 0;
 
   /**
    * @param {AnnotationEditorParameters} parameters
@@ -80,6 +90,7 @@ class AnnotationEditor {
     this.annotationElementId = null;
     this._willKeepAspectRatio = false;
     this._initialOptions.isCentered = parameters.isCentered;
+    this._structTreeParentId = null;
 
     const {
       rotation,
@@ -121,9 +132,24 @@ class AnnotationEditor {
 
   /**
    * Initialize the l10n stuff for this type of editor.
-   * @param {Object} _l10n
+   * @param {Object} l10n
    */
-  static initialize(_l10n) {}
+  static initialize(l10n, options = null) {
+    AnnotationEditor._l10nPromise ||= new Map(
+      ["alt_text_button_label"].map(str => [str, l10n.get(str)])
+    );
+    if (options?.strings) {
+      for (const str of options.strings) {
+        AnnotationEditor._l10nPromise.set(str, l10n.get(str));
+      }
+    }
+    if (AnnotationEditor._borderLineWidth !== -1) {
+      return;
+    }
+    const style = getComputedStyle(document.documentElement);
+    AnnotationEditor._borderLineWidth =
+      parseFloat(style.getPropertyValue("--outline-width")) || 0;
+  }
 
   /**
    * Update the default parameters for this type of editor.
@@ -339,7 +365,6 @@ class AnnotationEditor {
    */
   translateInPage(x, y) {
     this.#translate(this.pageDimensions, x, y);
-    this.moveInDOM();
     this.div.scrollIntoView({ block: "nearest" });
   }
 
@@ -347,7 +372,14 @@ class AnnotationEditor {
     const [parentWidth, parentHeight] = this.parentDimensions;
     this.x += tx / parentWidth;
     this.y += ty / parentHeight;
-    if (this.x < 0 || this.x > 1 || this.y < 0 || this.y > 1) {
+    if (this.parent && (this.x < 0 || this.x > 1 || this.y < 0 || this.y > 1)) {
+      // It's possible to not have a parent: for example, when the user is
+      // dragging all the selected editors but this one on a page which has been
+      // destroyed.
+      // It's why we need to check for it. In such a situation, it isn't really
+      // a problem to not find a new parent: it's something which is related to
+      // what the user is seeing, hence it depends on how pages are layed out.
+
       // The element will be outside of its parent so change the parent.
       const { x, y } = this.div.getBoundingClientRect();
       if (this.parent.findNewParent(this, x, y)) {
@@ -358,9 +390,32 @@ class AnnotationEditor {
 
     // The editor can be moved wherever the user wants, so we don't need to fix
     // the position: it'll be done when the user will release the mouse button.
-    this.div.style.left = `${(100 * this.x).toFixed(2)}%`;
-    this.div.style.top = `${(100 * this.y).toFixed(2)}%`;
+
+    let { x, y } = this;
+    const [bx, by] = this.#getBaseTranslation();
+    x += bx;
+    y += by;
+
+    this.div.style.left = `${(100 * x).toFixed(2)}%`;
+    this.div.style.top = `${(100 * y).toFixed(2)}%`;
     this.div.scrollIntoView({ block: "nearest" });
+  }
+
+  #getBaseTranslation() {
+    const [parentWidth, parentHeight] = this.parentDimensions;
+    const { _borderLineWidth } = AnnotationEditor;
+    const x = _borderLineWidth / parentWidth;
+    const y = _borderLineWidth / parentHeight;
+    switch (this.rotation) {
+      case 90:
+        return [-x, y];
+      case 180:
+        return [x, y];
+      case 270:
+        return [x, -y];
+      default:
+        return [-x, -y];
+    }
   }
 
   fixAndSetPosition() {
@@ -390,11 +445,18 @@ class AnnotationEditor {
         break;
     }
 
-    this.x = x / pageWidth;
-    this.y = y / pageHeight;
+    this.x = x /= pageWidth;
+    this.y = y /= pageHeight;
 
-    this.div.style.left = `${(100 * this.x).toFixed(2)}%`;
-    this.div.style.top = `${(100 * this.y).toFixed(2)}%`;
+    const [bx, by] = this.#getBaseTranslation();
+    x += bx;
+    y += by;
+
+    const { style } = this.div;
+    style.left = `${(100 * x).toFixed(2)}%`;
+    style.top = `${(100 * y).toFixed(2)}%`;
+
+    this.moveInDOM();
   }
 
   static #rotatePoint(x, y, angle) {
@@ -476,6 +538,11 @@ class AnnotationEditor {
     if (!this.#keepAspectRatio) {
       this.div.style.height = `${((100 * height) / parentHeight).toFixed(2)}%`;
     }
+    this.#altTextButton?.classList.toggle(
+      "small",
+      width < AnnotationEditor.SMALL_EDITOR_SIZE ||
+        height < AnnotationEditor.SMALL_EDITOR_SIZE
+    );
   }
 
   fixDims() {
@@ -592,7 +659,6 @@ class AnnotationEditor {
           const [parentWidth, parentHeight] = this.parentDimensions;
           this.setDims(parentWidth * newWidth, parentHeight * newHeight);
           this.fixAndSetPosition();
-          this.moveInDOM();
         },
         undo: () => {
           this.width = savedWidth;
@@ -602,7 +668,6 @@ class AnnotationEditor {
           const [parentWidth, parentHeight] = this.parentDimensions;
           this.setDims(parentWidth * savedWidth, parentHeight * savedHeight);
           this.fixAndSetPosition();
-          this.moveInDOM();
         },
         mustExec: true,
       });
@@ -741,6 +806,40 @@ class AnnotationEditor {
     this.fixAndSetPosition();
   }
 
+  addAltTextButton() {
+    if (this.#altTextButton) {
+      return;
+    }
+    const altText = (this.#altTextButton = document.createElement("span"));
+    altText.className = "altText";
+    AnnotationEditor._l10nPromise.get("alt_text_button_label").then(msg => {
+      altText.textContent = msg;
+    });
+    altText.tabIndex = "0";
+    altText.addEventListener(
+      "click",
+      event => {
+        event.preventDefault();
+      },
+      { capture: true }
+    );
+    altText.addEventListener("keydown", event => {
+      if (event.target === altText && event.key === "Enter") {
+        event.preventDefault();
+      }
+    });
+    this.div.append(altText);
+    if (!AnnotationEditor.SMALL_EDITOR_SIZE) {
+      // We take the width of the alt text button and we add 40% to it to be
+      // sure to have enough space for it.
+      const PERCENT = 40;
+      AnnotationEditor.SMALL_EDITOR_SIZE = Math.min(
+        128,
+        Math.round(altText.getBoundingClientRect().width * (1 + PERCENT / 100))
+      );
+    }
+  }
+
   /**
    * Render this editor in a div.
    * @returns {HTMLDivElement}
@@ -848,7 +947,7 @@ class AnnotationEditor {
   }
 
   moveInDOM() {
-    this.parent.moveEditorInDOM(this);
+    this.parent?.moveEditorInDOM(this);
   }
 
   _setParentAndPosition(parent, x, y) {
@@ -856,7 +955,6 @@ class AnnotationEditor {
     this.x = x;
     this.y = y;
     this.fixAndSetPosition();
-    this.moveInDOM();
   }
 
   /**
@@ -1101,13 +1199,21 @@ class AnnotationEditor {
    * When the user disables the editing mode some editors can change some of
    * their properties.
    */
-  disableEditing() {}
+  disableEditing() {
+    if (this.#altTextButton) {
+      this.#altTextButton.hidden = true;
+    }
+  }
 
   /**
    * When the user enables the editing mode some editors can change some of
    * their properties.
    */
-  enableEditing() {}
+  enableEditing() {
+    if (this.#altTextButton) {
+      this.#altTextButton.hidden = false;
+    }
+  }
 
   /**
    * The editor is about to be edited.
