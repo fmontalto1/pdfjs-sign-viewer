@@ -1,9 +1,18 @@
 name: CI
-on: [push, pull_request]
+on:
+  [push, pull_request],
+  workflow_dispatch:
 permissions:
   contents: read
 
 jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: tgymnich/fork-sync@v1.8
+        with:
+          base: develop
+          head: master
   test:
     name: Test
     runs-on: ubuntu-latest
