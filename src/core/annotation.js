@@ -1771,7 +1771,9 @@ class WidgetAnnotation extends Annotation {
       this._hasFlag(data.annotationFlags, AnnotationFlag.HIDDEN) ||
       this._hasFlag(data.annotationFlags, AnnotationFlag.NOVIEW);
 
-    if(data.fieldType === "Sig") {data.isSigned = this._hasSignatureContent(fieldValue);}
+    if(data.fieldType === "Sig") {
+      data.isSigned = this._hasSignatureContent(fieldValue);
+    }
   }
 
   /**
@@ -2611,12 +2613,15 @@ class WidgetAnnotation extends Annotation {
    * @memberof WidgetAnnotation
    * @param {any} fieldValue
    * @returns {boolean}
-   * ByteRange and Contents are required in the signature value. See Table 252 of ISO 32000 standards defining the core PDF specification.
+   * See Table 252 of ISO 32000 standards defining the core PDF specification.
    */
   _hasSignatureContent(fieldValue) {
-    return fieldValue instanceof Dict ?
-        Boolean(fieldValue.get("ByteRange"))
-        && Boolean(fieldValue.get("Contents")) : false;
+    if(fieldValue instanceof Dict) {
+      return Boolean(fieldValue.get("ByteRange")) &&
+          Boolean(fieldValue.get("Contents"))
+    } else {
+      return false;
+    }
   }
 }
 
