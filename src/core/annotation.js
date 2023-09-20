@@ -1572,7 +1572,7 @@ class MarkupAnnotation extends Annotation {
       buffer.push(`${strokeColor[0]} ${strokeColor[1]} ${strokeColor[2]} RG`);
     }
     if (fillColor) {
-      buffer.push(`${fillColor[0]} ${fillColor[1]} ${fillColor[2]} rg`);
+     buffer.push(`${fillColor[0]} ${fillColor[1]} ${fillColor[2]} rg`);
     }
 
     let pointsArray = this.data.quadPoints;
@@ -2617,8 +2617,7 @@ class WidgetAnnotation extends Annotation {
    */
   _hasSignatureContent(fieldValue) {
     if (fieldValue instanceof Dict) {
-      return Boolean(fieldValue.get("ByteRange") && fieldValue.get("Contents")
-      );
+      return Boolean(fieldValue.get("ByteRange") && fieldValue.get("Contents"));
     }
     return false;
   }
