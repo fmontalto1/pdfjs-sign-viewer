@@ -2616,10 +2616,11 @@ class WidgetAnnotation extends Annotation {
    * See Table 252 of ISO 32000 standards defining the core PDF specification.
    */
   _hasSignatureContent(fieldValue) {
-    if(fieldValue instanceof Dict) {
-      return Boolean (
-          fieldValue.get("ByteRange")) &&
-        Boolean (fieldValue.get("Contents"))
+    if (fieldValue instanceof Dict) {
+      return Boolean(
+          fieldValue.get("ByteRange") &&
+          fieldValue.get("Contents")
+      );
     }
     return false;
   }
