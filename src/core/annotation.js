@@ -1771,8 +1771,8 @@ class WidgetAnnotation extends Annotation {
       this._hasFlag(data.annotationFlags, AnnotationFlag.HIDDEN) ||
       this._hasFlag(data.annotationFlags, AnnotationFlag.NOVIEW);
 
-    if(data.fieldType === "Sig") {
-      data.isSigned = this._hasSignatureContent(fieldValue);
+    if (data.fieldType === "Sig") {
+       data.isSigned = this._hasSignatureContent(fieldValue);
     }
   }
 
@@ -2617,9 +2617,7 @@ class WidgetAnnotation extends Annotation {
    */
   _hasSignatureContent(fieldValue) {
     if (fieldValue instanceof Dict) {
-      return Boolean(
-          fieldValue.get("ByteRange") &&
-          fieldValue.get("Contents")
+      return Boolean(fieldValue.get("ByteRange") && fieldValue.get("Contents")
       );
     }
     return false;

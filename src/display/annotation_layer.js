@@ -1510,7 +1510,7 @@ class TextWidgetAnnotationElement extends WidgetAnnotationElement {
 
 class SignatureWidgetAnnotationElement extends WidgetAnnotationElement {
   constructor(parameters) {
-    if(
+     if(
       window?.PDFViewerApplicationOptions?.get(
         "showSignatureWidgetAnnotationEmpty"
       ) &&
@@ -1525,9 +1525,9 @@ class SignatureWidgetAnnotationElement extends WidgetAnnotationElement {
     const element = document.createElement("button");
     element.setAttribute("data-sign-annotation-id", this.data.id);
     element.setAttribute("class", "sign-box");
-    element.addEventListener("click",() =>
+    element.addEventListener("click",() => 
       element.dispatchEvent(
-          new CustomEvent("signClick", { detail: this.data.id })
+        new CustomEvent("signClick", { detail: this.data.id })
       )
     );
     element.addEventListener(
@@ -1538,7 +1538,7 @@ class SignatureWidgetAnnotationElement extends WidgetAnnotationElement {
           detail: this.data.id,
         });
       },
-        false
+      false
     );
     this.container.append(element);
     return this.container;
