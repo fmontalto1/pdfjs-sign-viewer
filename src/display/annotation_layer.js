@@ -1510,8 +1510,7 @@ class TextWidgetAnnotationElement extends WidgetAnnotationElement {
 
 class SignatureWidgetAnnotationElement extends WidgetAnnotationElement {
   constructor(parameters) {
-    if(window?.PDFViewerApplicationOptions?.get('showSignatureWidgetAnnotationEmpty')
-      && !parameters.data.isSigned) {
+    if(window?.PDFViewerApplicationOptions?.get("showSignatureWidgetAnnotationEmpty") && !parameters.data.isSigned) {
       parameters.data.hasOwnCanvas = true;
     }
     super(parameters, { isRenderable: !!parameters.data.hasOwnCanvas });
@@ -1520,7 +1519,7 @@ class SignatureWidgetAnnotationElement extends WidgetAnnotationElement {
   render() {
     const element = document.createElement("button");
     element.setAttribute("data-sign-annotation-id", this.data.id);
-    element.setAttribute("class", 'sign-box');
+    element.setAttribute("class", "sign-box");
     element.addEventListener("click",() =>
       element.dispatchEvent(new CustomEvent("signClick", { detail: this.data.id })));
     element.addEventListener(
