@@ -2617,11 +2617,11 @@ class WidgetAnnotation extends Annotation {
    */
   _hasSignatureContent(fieldValue) {
     if(fieldValue instanceof Dict) {
-      return Boolean(fieldValue.get("ByteRange")) &&
-          Boolean(fieldValue.get("Contents"))
-    } else {
-      return false;
+      return Boolean (
+          fieldValue.get("ByteRange")) &&
+        Boolean (fieldValue.get("Contents"))
     }
+    return false;
   }
 }
 
