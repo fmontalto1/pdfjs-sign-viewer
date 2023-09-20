@@ -1572,7 +1572,7 @@ class MarkupAnnotation extends Annotation {
       buffer.push(`${strokeColor[0]} ${strokeColor[1]} ${strokeColor[2]} RG`);
     }
     if (fillColor) {
-     buffer.push(`${fillColor[0]} ${fillColor[1]} ${fillColor[2]} rg`);
+      buffer.push(`${fillColor[0]} ${fillColor[1]} ${fillColor[2]} rg`);
     }
 
     let pointsArray = this.data.quadPoints;
@@ -1772,7 +1772,7 @@ class WidgetAnnotation extends Annotation {
       this._hasFlag(data.annotationFlags, AnnotationFlag.NOVIEW);
 
     if (data.fieldType === "Sig") {
-       data.isSigned = this._hasSignatureContent(fieldValue);
+      data.isSigned = this._hasSignatureContent(fieldValue);
     }
   }
 
