@@ -1,17 +1,44 @@
 name: Sync Fork
+env:
+  # Required, URL to upstream (fork base)
+  UPSTREAM_URL: "https://github.com/mozilla/pdf.js.git"
+  # Required, token to authenticate bot, could use ${{ secrets.GITHUB_TOKEN }}
+  # Over here, we use a PAT instead to authenticate workflow file changes.
+  WORKFLOW_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # Optional, defaults to main
+  UPSTREAM_BRANCH: "master"
+  # Optional, defaults to UPSTREAM_BRANCH
+  DOWNSTREAM_BRANCH: "develop"
+  # Optional fetch arguments
+  FETCH_ARGS: ""
+  # Optional merge arguments
+  MERGE_ARGS: ""
+  # Optional push arguments
+  PUSH_ARGS: ""
+  # Optional toggle to spawn time logs (keeps action active)
+  SPAWN_LOGS: "false" # "true" or "false"
 
+# This runs every day on 1801 UTC
 on:
   schedule:
-    - cron: '*/5 * * * *' # every 5 minutes
-  workflow_dispatch: # on button click
+    - cron: '0 6 * * 1' # Every Monday at 6 AM UTC
+  # Allows manual workflow run (must in default branch to work)
+  workflow_dispatch:
 
 jobs:
   sync:
-
     runs-on: ubuntu-latest
-
     steps:
-      - uses: tgymnich/fork-sync@v1.8
+      - uses: actions/checkout@v3
+
+      - name: GitHub Sync to Upstream Repository
+        uses: dabreadman/sync-upstream-repo@v1.3.0
         with:
-          base: develop
-          head: master
+          upstream_repo: ${{ env.UPSTREAM_URL }}
+          upstream_branch: ${{ env.UPSTREAM_BRANCH }}
+          downstream_branch: ${{ env.DOWNSTREAM_BRANCH }}
+          token: ${{ env.WORKFLOW_TOKEN }}
+            # fetch_args: ${{ env.FETCH_ARGS }}
+            # merge_args: ${{ env.MERGE_ARGS }}
+            # push_args: ${{ env.PUSH_ARGS }}
+            # pawn_logs: ${{ env.SPAWN_LOGS }}
