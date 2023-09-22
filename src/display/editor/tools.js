@@ -525,6 +525,8 @@ class AnnotationEditorUIManager {
 
   #allLayers = new Map();
 
+  #altTextManager = null;
+
   #annotationStorage = null;
 
   #commandManager = new CommandManager();
@@ -538,8 +540,6 @@ class AnnotationEditorUIManager {
   #editorTypes = null;
 
   #editorsToRescale = new Set();
-
-  #eventBus = null;
 
   #filterFactory = null;
 
@@ -693,14 +693,22 @@ class AnnotationEditorUIManager {
     );
   }
 
-  constructor(container, viewer, eventBus, pdfDocument, pageColors) {
+  constructor(
+    container,
+    viewer,
+    altTextManager,
+    eventBus,
+    pdfDocument,
+    pageColors
+  ) {
     this.#container = container;
     this.#viewer = viewer;
-    this.#eventBus = eventBus;
-    this.#eventBus._on("editingaction", this.#boundOnEditingAction);
-    this.#eventBus._on("pagechanging", this.#boundOnPageChanging);
-    this.#eventBus._on("scalechanging", this.#boundOnScaleChanging);
-    this.#eventBus._on("rotationchanging", this.#boundOnRotationChanging);
+    this.#altTextManager = altTextManager;
+    this._eventBus = eventBus;
+    this._eventBus._on("editingaction", this.#boundOnEditingAction);
+    this._eventBus._on("pagechanging", this.#boundOnPageChanging);
+    this._eventBus._on("scalechanging", this.#boundOnScaleChanging);
+    this._eventBus._on("rotationchanging", this.#boundOnRotationChanging);
     this.#annotationStorage = pdfDocument.annotationStorage;
     this.#filterFactory = pdfDocument.filterFactory;
     this.#pageColors = pageColors;
@@ -713,10 +721,10 @@ class AnnotationEditorUIManager {
   destroy() {
     this.#removeKeyboardManager();
     this.#removeFocusManager();
-    this.#eventBus._off("editingaction", this.#boundOnEditingAction);
-    this.#eventBus._off("pagechanging", this.#boundOnPageChanging);
-    this.#eventBus._off("scalechanging", this.#boundOnScaleChanging);
-    this.#eventBus._off("rotationchanging", this.#boundOnRotationChanging);
+    this._eventBus._off("editingaction", this.#boundOnEditingAction);
+    this._eventBus._off("pagechanging", this.#boundOnPageChanging);
+    this._eventBus._off("scalechanging", this.#boundOnScaleChanging);
+    this._eventBus._off("rotationchanging", this.#boundOnRotationChanging);
     for (const layer of this.#allLayers.values()) {
       layer.destroy();
     }
@@ -726,6 +734,7 @@ class AnnotationEditorUIManager {
     this.#activeEditor = null;
     this.#selectedEditors.clear();
     this.#commandManager.destroy();
+    this.#altTextManager.destroy();
   }
 
   get hcmFilter() {
@@ -747,6 +756,10 @@ class AnnotationEditorUIManager {
       "direction",
       getComputedStyle(this.#container).direction
     );
+  }
+
+  editAltText(editor) {
+    this.#altTextManager?.editAltText(this, editor);
   }
 
   onPageChanging({ pageNumber }) {
@@ -884,6 +897,16 @@ class AnnotationEditorUIManager {
     document.removeEventListener("paste", this.#boundPaste);
   }
 
+  addEditListeners() {
+    this.#addKeyboardManager();
+    this.#addCopyPasteListeners();
+  }
+
+  removeEditListeners() {
+    this.#removeKeyboardManager();
+    this.#removeCopyPasteListeners();
+  }
+
   /**
    * Copy callback.
    * @param {ClipboardEvent} event
@@ -1016,7 +1039,7 @@ class AnnotationEditorUIManager {
     );
 
     if (hasChanged) {
-      this.#eventBus.dispatch("annotationeditorstateschanged", {
+      this._eventBus.dispatch("annotationeditorstateschanged", {
         source: this,
         details: Object.assign(this.#previousStates, details),
       });
@@ -1024,7 +1047,7 @@ class AnnotationEditorUIManager {
   }
 
   #dispatchUpdateUI(details) {
-    this.#eventBus.dispatch("annotationeditorparamschanged", {
+    this._eventBus.dispatch("annotationeditorparamschanged", {
       source: this,
       details,
     });
@@ -1152,7 +1175,7 @@ class AnnotationEditorUIManager {
     if (mode === this.#mode) {
       return;
     }
-    this.#eventBus.dispatch("switchannotationeditormode", {
+    this._eventBus.dispatch("switchannotationeditormode", {
       source: this,
       mode,
     });
