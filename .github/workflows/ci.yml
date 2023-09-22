@@ -1,4 +1,6 @@
 name: CI
+env:
+  JOB_CONTEXT: ${{ toJson(job) }}
 on:
   workflow_dispatch:
   push:
@@ -39,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Make changes to pull request
-        run: date +%s + needs.test.steps.tests.outcome > report.txt
+        run: echo "$JOB_CONTEXT"
 
       - name: Create Pull Request
         id: cpr
