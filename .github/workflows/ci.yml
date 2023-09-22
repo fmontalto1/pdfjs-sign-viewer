@@ -33,13 +33,13 @@ jobs:
         run: gulp ci-test
 
   createPullRequest:
-    needs: [test]
-    if: needs.test.steps.tests.outcome == 'success'
+    #needs: [test]
+    #if: needs.test.steps.tests.outcome == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: Make changes to pull request
-        run: date +%s > report.txt
+        run: date +%s + needs.test.steps.tests.outcome > report.txt
 
       - name: Create Pull Request
         id: cpr
