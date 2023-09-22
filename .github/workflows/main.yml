@@ -10,7 +10,7 @@ env:
   # Optional, defaults to UPSTREAM_BRANCH
   DOWNSTREAM_BRANCH: "develop"
   # Optional fetch arguments
-  FETCH_ARGS: ""
+  FETCH_ARGS: "--tags"
   # Optional merge arguments
   MERGE_ARGS: ""
   # Optional push arguments
@@ -38,7 +38,7 @@ jobs:
           upstream_branch: ${{ env.UPSTREAM_BRANCH }}
           downstream_branch: ${{ env.DOWNSTREAM_BRANCH }}
           token: ${{ env.WORKFLOW_TOKEN }}
-            # fetch_args: ${{ env.FETCH_ARGS }}
+          fetch_args: ${{ env.FETCH_ARGS }}
             # merge_args: ${{ env.MERGE_ARGS }}
             # push_args: ${{ env.PUSH_ARGS }}
             # pawn_logs: ${{ env.SPAWN_LOGS }}
