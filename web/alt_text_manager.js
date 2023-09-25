@@ -52,6 +52,8 @@ class AltTextManager {
 
   #container;
 
+  #telemetryData = null;
+
   constructor(
     {
       dialog,
@@ -76,11 +78,15 @@ class AltTextManager {
     this.#container = container;
 
     dialog.addEventListener("close", this.#close.bind(this));
-    cancelButton.addEventListener("click", this.#cancel.bind(this));
+    dialog.addEventListener("contextmenu", event => {
+      if (event.target !== this.#textarea) {
+        event.preventDefault();
+      }
+    });
+    cancelButton.addEventListener("click", this.#finish.bind(this));
     saveButton.addEventListener("click", this.#save.bind(this));
     optionDescription.addEventListener("change", this.#boundUpdateUIState);
     optionDecorative.addEventListener("change", this.#boundUpdateUIState);
-    textarea.addEventListener("input", this.#boundUpdateUIState);
 
     this.#overlayManager.register(dialog);
   }
@@ -241,22 +247,20 @@ class AltTextManager {
     }
   }
 
-  #cancel() {
+  #close() {
     this.#eventBus.dispatch("reporttelemetry", {
       source: this,
       details: {
         type: "editing",
         subtype: this.#currentEditor.editorType,
-        data: {
+        data: this.#telemetryData || {
           action: "alt_text_cancel",
           alt_text_keyboard: !this.#hasUsedPointer,
         },
       },
     });
-    this.#finish();
-  }
+    this.#telemetryData = null;
 
-  #close() {
     this.#removeOnClickListeners();
     this.#uiManager?.addEditListeners();
     this.#eventBus._off("resize", this.#boundSetPosition);
@@ -265,11 +269,7 @@ class AltTextManager {
   }
 
   #updateUIState() {
-    const hasAltText = !!this.#textarea.value.trim();
-    const decorative = this.#optionDecorative.checked;
-
-    this.#textarea.disabled = decorative;
-    this.#saveButton.disabled = !decorative && !hasAltText;
+    this.#textarea.disabled = this.#optionDecorative.checked;
   }
 
   #save() {
@@ -279,21 +279,14 @@ class AltTextManager {
       altText,
       decorative,
     };
-    this.#eventBus.dispatch("reporttelemetry", {
-      source: this,
-      details: {
-        type: "editing",
-        subtype: this.#currentEditor.editorType,
-        data: {
-          action: "alt_text_save",
-          alt_text_description: !!altText,
-          alt_text_edit:
-            !!this.#previousAltText && this.#previousAltText !== altText,
-          alt_text_decorative: decorative,
-          alt_text_keyboard: !this.#hasUsedPointer,
-        },
-      },
-    });
+    this.#telemetryData = {
+      action: "alt_text_save",
+      alt_text_description: !!altText,
+      alt_text_edit:
+        !!this.#previousAltText && this.#previousAltText !== altText,
+      alt_text_decorative: decorative,
+      alt_text_keyboard: !this.#hasUsedPointer,
+    };
     this.#finish();
   }
 
@@ -312,8 +305,7 @@ class AltTextManager {
   }
 
   destroy() {
-    this.#currentEditor = null;
-    this.#uiManager = null;
+    this.#uiManager = null; // Avoid re-adding the edit listeners.
     this.#finish();
     this.#svgElement?.remove();
     this.#svgElement = this.#rectElement = null;

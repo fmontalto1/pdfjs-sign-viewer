@@ -169,6 +169,7 @@
       position: absolute;
       inset: 0;
       border: var(--focus-outline-around);
+      pointer-events: none;
     }
   }
 
@@ -461,6 +462,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding-inline: 4px;
   width: auto;
   height: 24px;
   min-width: 88px;
