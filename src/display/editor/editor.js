@@ -59,6 +59,8 @@ class AnnotationEditor {
 
   #isInEditMode = false;
 
+  #moveInDOMTimeout = null;
+
   _initialOptions = Object.create(null);
 
   _uiManager = null;
@@ -620,10 +622,13 @@ class AnnotationEditor {
       return;
     }
 
+    this.#toggleAltTextButton(false);
+
     const boundResizerPointermove = this.#resizerPointermove.bind(this, name);
     const savedDraggable = this._isDraggable;
     this._isDraggable = false;
     const pointerMoveOptions = { passive: true, capture: true };
+    this.parent.togglePointerEvents(false);
     window.addEventListener(
       "pointermove",
       boundResizerPointermove,
@@ -639,6 +644,8 @@ class AnnotationEditor {
       window.getComputedStyle(event.target).cursor;
 
     const pointerUpCallback = () => {
+      this.parent.togglePointerEvents(true);
+      this.#toggleAltTextButton(true);
       this._isDraggable = savedDraggable;
       window.removeEventListener("pointerup", pointerUpCallback);
       window.removeEventListener("blur", pointerUpCallback);
@@ -902,8 +909,10 @@ class AnnotationEditor {
         }, DELAY_TO_SHOW_TOOLTIP);
       });
       button.addEventListener("mouseleave", () => {
-        clearTimeout(this.#altTextTooltipTimeout);
-        this.#altTextTooltipTimeout = null;
+        if (this.#altTextTooltipTimeout) {
+          clearTimeout(this.#altTextTooltipTimeout);
+          this.#altTextTooltipTimeout = null;
+        }
         this.#altTextTooltip?.classList.remove("show");
       });
     }
@@ -917,6 +926,17 @@ class AnnotationEditor {
     if (!tooltip.parentNode) {
       button.append(tooltip);
     }
+  }
+
+  #toggleAltTextButton(enabled = false) {
+    if (!this.#altTextButton) {
+      return;
+    }
+    if (!enabled && this.#altTextTooltipTimeout) {
+      clearTimeout(this.#altTextTooltipTimeout);
+      this.#altTextTooltipTimeout = null;
+    }
+    this.#altTextButton.disabled = !enabled;
   }
 
   getClientDimensions() {
@@ -941,7 +961,7 @@ class AnnotationEditor {
 
   /**
    * Render this editor in a div.
-   * @returns {HTMLDivElement}
+   * @returns {HTMLDivElement | null}
    */
   render() {
     this.div = document.createElement("div");
@@ -1046,7 +1066,16 @@ class AnnotationEditor {
   }
 
   moveInDOM() {
-    this.parent?.moveEditorInDOM(this);
+    // Moving the editor in the DOM can be expensive, so we wait a bit before.
+    // It's important to not block the UI (for example when changing the font
+    // size in a FreeText).
+    if (this.#moveInDOMTimeout) {
+      clearTimeout(this.#moveInDOMTimeout);
+    }
+    this.#moveInDOMTimeout = setTimeout(() => {
+      this.#moveInDOMTimeout = null;
+      this.parent?.moveEditorInDOM(this);
+    }, 0);
   }
 
   _setParentAndPosition(parent, x, y) {
@@ -1192,8 +1221,9 @@ class AnnotationEditor {
    * new annotation to add to the pdf document.
    *
    * To implement in subclasses.
-   * @param {boolean} isForCopying
-   * @param {Object} [context]
+   * @param {boolean} [isForCopying]
+   * @param {Object | null} [context]
+   * @returns {Object | null}
    */
   serialize(isForCopying = false, context = null) {
     unreachable("An editor must be serializable");
@@ -1206,7 +1236,7 @@ class AnnotationEditor {
    * @param {Object} data
    * @param {AnnotationEditorLayer} parent
    * @param {AnnotationEditorUIManager} uiManager
-   * @returns {AnnotationEditor}
+   * @returns {AnnotationEditor | null}
    */
   static deserialize(data, parent, uiManager) {
     const editor = new this.prototype.constructor({
@@ -1253,6 +1283,10 @@ class AnnotationEditor {
     this.#altTextButton?.remove();
     this.#altTextButton = null;
     this.#altTextTooltip = null;
+    if (this.#moveInDOMTimeout) {
+      clearTimeout(this.#moveInDOMTimeout);
+      this.#moveInDOMTimeout = null;
+    }
   }
 
   /**
@@ -1327,6 +1361,7 @@ class AnnotationEditor {
 
   /**
    * Get the div which really contains the displayed content.
+   * @returns {HTMLDivElement | undefined}
    */
   get contentDiv() {
     return this.div;
