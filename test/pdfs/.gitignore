@@ -51,6 +51,7 @@
 !issue7439.pdf
 !issue7847_radial.pdf
 !issue8844.pdf
+!issue17056.pdf
 !issue14953.pdf
 !issue15367.pdf
 !issue15372.pdf
@@ -119,6 +120,7 @@
 !issue7891_bc0.pdf
 !issue11242_reduced.pdf
 !issue16176.pdf
+!issue17064_readonly.pdf
 !issue11279.pdf
 !issue11362.pdf
 !issue13325_reduced.pdf
@@ -612,3 +614,5 @@
 !empty_protected.pdf
 !tagged_stamp.pdf
 !bug1851498.pdf
+!issue17065.pdf
+!issue17069.pdf

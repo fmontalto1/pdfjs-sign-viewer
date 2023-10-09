@@ -50,7 +50,6 @@ import {
   getDocument,
   PDFDataRangeTransport,
   PDFWorker,
-  SVGGraphics,
   version,
 } from "./display/api.js";
 import {
@@ -60,7 +59,6 @@ import {
   getXfaPageViewport,
   isDataScheme,
   isPdfFile,
-  loadScript,
   noContextMenu,
   PDFDateString,
   PixelsPerInch,
@@ -103,7 +101,6 @@ export {
   InvalidPDFException,
   isDataScheme,
   isPdfFile,
-  loadScript,
   MissingPDFException,
   noContextMenu,
   normalizeUnicode,
@@ -119,7 +116,6 @@ export {
   renderTextLayer,
   setLayerDimensions,
   shadow,
-  SVGGraphics,
   UnexpectedResponseException,
   updateTextLayer,
   Util,

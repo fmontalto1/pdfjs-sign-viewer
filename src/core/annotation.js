@@ -2863,6 +2863,7 @@ class ButtonWidgetAnnotation extends WidgetAnnotation {
       this._processRadioButton(params);
     } else if (this.data.pushButton) {
       this.data.hasOwnCanvas = true;
+      this.data.noHTML = false;
       this._processPushButton(params);
     } else {
       warn("Invalid field flags for button widget annotation");
@@ -3588,6 +3589,7 @@ class SignatureWidgetAnnotation extends WidgetAnnotation {
     // to the main-thread (issue 10347).
     this.data.fieldValue = null;
     this.data.hasOwnCanvas = this.data.noRotate;
+    this.data.noHTML = !this.data.hasOwnCanvas;
   }
 
   getFieldObject() {
@@ -3609,6 +3611,7 @@ class TextAnnotation extends MarkupAnnotation {
     // No rotation for Text (see 12.5.6.4).
     this.data.noRotate = true;
     this.data.hasOwnCanvas = this.data.noRotate;
+    this.data.noHTML = false;
 
     const { dict } = params;
     this.data.annotationType = AnnotationType.TEXT;
@@ -3661,6 +3664,11 @@ class PopupAnnotation extends Annotation {
 
     const { dict } = params;
     this.data.annotationType = AnnotationType.POPUP;
+
+    // A pop-up is never rendered on the main canvas so we must render its HTML
+    // version.
+    this.data.noHTML = false;
+
     if (
       this.data.rect[0] === this.data.rect[2] ||
       this.data.rect[1] === this.data.rect[3]
@@ -3730,7 +3738,12 @@ class FreeTextAnnotation extends MarkupAnnotation {
   constructor(params) {
     super(params);
 
-    this.data.hasOwnCanvas = true;
+    // It uses its own canvas in order to be hidden if edited.
+    // But if it has the noHTML flag, it means that we don't want to be able
+    // to modify it so we can just draw it on the main canvas.
+    this.data.hasOwnCanvas = !this.data.noHTML;
+    // We want to be able to add mouse listeners to the annotation.
+    this.data.noHTML = false;
 
     const { evaluatorOptions, xref } = params;
     this.data.annotationType = AnnotationType.FREETEXT;
@@ -3944,6 +3957,7 @@ class LineAnnotation extends MarkupAnnotation {
     const { dict, xref } = params;
     this.data.annotationType = AnnotationType.LINE;
     this.data.hasOwnCanvas = this.data.noRotate;
+    this.data.noHTML = false;
 
     const lineCoordinates = dict.getArray("L");
     this.data.lineCoordinates = Util.normalizeRect(lineCoordinates);
@@ -4011,6 +4025,7 @@ class SquareAnnotation extends MarkupAnnotation {
     const { dict, xref } = params;
     this.data.annotationType = AnnotationType.SQUARE;
     this.data.hasOwnCanvas = this.data.noRotate;
+    this.data.noHTML = false;
 
     if (!this.appearance) {
       // The default stroke color is black.
@@ -4123,6 +4138,7 @@ class PolylineAnnotation extends MarkupAnnotation {
     const { dict, xref } = params;
     this.data.annotationType = AnnotationType.POLYLINE;
     this.data.hasOwnCanvas = this.data.noRotate;
+    this.data.noHTML = false;
     this.data.vertices = [];
 
     if (
@@ -4211,6 +4227,7 @@ class InkAnnotation extends MarkupAnnotation {
     super(params);
 
     this.data.hasOwnCanvas = this.data.noRotate;
+    this.data.noHTML = false;
 
     const { dict, xref } = params;
     this.data.annotationType = AnnotationType.INK;
@@ -4549,6 +4566,7 @@ class StampAnnotation extends MarkupAnnotation {
 
     this.data.annotationType = AnnotationType.STAMP;
     this.data.hasOwnCanvas = this.data.noRotate;
+    this.data.noHTML = false;
   }
 
   static async createImage(bitmap, xref) {
@@ -4698,6 +4716,7 @@ class FileAttachmentAnnotation extends MarkupAnnotation {
 
     this.data.annotationType = AnnotationType.FILEATTACHMENT;
     this.data.hasOwnCanvas = this.data.noRotate;
+    this.data.noHTML = false;
     this.data.file = file.serializable;
 
     const name = dict.get("Name");

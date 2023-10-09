@@ -280,13 +280,6 @@ class PDFViewer {
     this.enablePrintAutoRotate = options.enablePrintAutoRotate || false;
     if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
       this.removePageBorders = options.removePageBorders || false;
-
-      if (options.useOnlyCssZoom) {
-        console.error(
-          "useOnlyCssZoom was removed, please use `maxCanvasPixels = 0` instead."
-        );
-        options.maxCanvasPixels = 0;
-      }
     }
     this.isOffscreenCanvasSupported =
       options.isOffscreenCanvasSupported ?? true;
@@ -2215,7 +2208,7 @@ class PDFViewer {
   /**
    * @param {number} mode - AnnotationEditor mode (None, FreeText, Ink, ...)
    */
-  set annotationEditorMode({ mode, editId = null }) {
+  set annotationEditorMode({ mode, editId = null, isFromKeyboard = false }) {
     if (!this.#annotationEditorUIManager) {
       throw new Error(`The AnnotationEditor is not enabled.`);
     }
@@ -2234,7 +2227,7 @@ class PDFViewer {
       mode,
     });
 
-    this.#annotationEditorUIManager.updateMode(mode, editId);
+    this.#annotationEditorUIManager.updateMode(mode, editId, isFromKeyboard);
   }
 
   // eslint-disable-next-line accessor-pairs

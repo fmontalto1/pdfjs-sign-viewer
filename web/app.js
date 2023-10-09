@@ -44,7 +44,6 @@ import {
   InvalidPDFException,
   isDataScheme,
   isPdfFile,
-  loadScript,
   MissingPDFException,
   PDFWorker,
   PromiseCapability,
@@ -1040,22 +1039,6 @@ const PDFViewerApplication = {
    * @returns {Promise} - Promise that is resolved when the document is opened.
    */
   async open(args) {
-    if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
-      let deprecatedArgs = false;
-      if (typeof args === "string") {
-        args = { url: args }; // URL
-        deprecatedArgs = true;
-      } else if (args?.byteLength) {
-        args = { data: args }; // ArrayBuffer
-        deprecatedArgs = true;
-      }
-      if (deprecatedArgs) {
-        console.error(
-          "The `PDFViewerApplication.open` signature was updated, please use an object instead."
-        );
-      }
-    }
-
     if (this.pdfLoadingTask) {
       // We need to destroy already opened document.
       await this.close();
@@ -2280,10 +2263,10 @@ async function loadFakeWorker() {
   GlobalWorkerOptions.workerSrc ||= AppOptions.get("workerSrc");
 
   if (typeof PDFJSDev === "undefined") {
-    window.pdfjsWorker = await import("pdfjs/pdf.worker.js");
+    globalThis.pdfjsWorker = await import("pdfjs/pdf.worker.js");
     return;
   }
-  await loadScript(PDFWorker.workerSrc);
+  await __non_webpack_import__(PDFWorker.workerSrc); // eslint-disable-line no-undef
 }
 
 async function loadPDFBug(self) {
@@ -3116,6 +3099,8 @@ function webViewerKeyDown(evt) {
     curElementTagName === "INPUT" ||
     curElementTagName === "TEXTAREA" ||
     curElementTagName === "SELECT" ||
+    (curElementTagName === "BUTTON" &&
+      (evt.keyCode === /* Enter = */ 13 || evt.keyCode === /* Space = */ 32)) ||
     curElement?.isContentEditable
   ) {
     // Make sure that the secondary toolbar is closed when Escape is pressed.

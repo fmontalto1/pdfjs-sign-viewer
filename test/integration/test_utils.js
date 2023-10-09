@@ -207,7 +207,18 @@ function getEditorDimensions(page, id) {
 }
 exports.getEditorDimensions = getEditorDimensions;
 
-function serializeBitmapDimensions(page) {
+async function serializeBitmapDimensions(page) {
+  await page.waitForFunction(() => {
+    try {
+      const map =
+        window.PDFViewerApplication.pdfDocument.annotationStorage.serializable
+          .map;
+      return !!map;
+    } catch {
+      return false;
+    }
+  });
+
   return page.evaluate(() => {
     const { map } =
       window.PDFViewerApplication.pdfDocument.annotationStorage.serializable;
@@ -241,6 +252,15 @@ async function waitForAnnotationEditorLayer(page) {
   });
 }
 exports.waitForAnnotationEditorLayer = waitForAnnotationEditorLayer;
+
+async function waitForTextLayer(page) {
+  return page.evaluate(() => {
+    return new Promise(resolve => {
+      window.PDFViewerApplication.eventBus.on("textlayerrendered", resolve);
+    });
+  });
+}
+exports.waitForTextLayer = waitForTextLayer;
 
 async function scrollIntoView(page, selector) {
   const promise = page.evaluate(

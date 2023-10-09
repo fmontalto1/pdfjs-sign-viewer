@@ -15,10 +15,13 @@
 
 // eslint-disable-next-line max-len
 /** @typedef {import("./annotation_editor_layer.js").AnnotationEditorLayer} AnnotationEditorLayer */
-// eslint-disable-next-line max-len
-/** @typedef {import("./tools.js").AnnotationEditorUIManager} AnnotationEditorUIManager */
 
-import { bindEvents, ColorManager } from "./tools.js";
+import {
+  AnnotationEditorUIManager,
+  bindEvents,
+  ColorManager,
+  KeyboardManager,
+} from "./tools.js";
 import { FeatureTest, shadow, unreachable } from "../../shared/util.js";
 import { noContextMenu } from "../display_utils.js";
 
@@ -35,6 +38,8 @@ import { noContextMenu } from "../display_utils.js";
  * Base class for editors.
  */
 class AnnotationEditor {
+  #allResizerDivs = null;
+
   #altText = "";
 
   #altTextDecorative = false;
@@ -45,19 +50,27 @@ class AnnotationEditor {
 
   #altTextTooltipTimeout = null;
 
+  #altTextWasFromKeyBoard = false;
+
   #keepAspectRatio = false;
 
   #resizersDiv = null;
 
+  #savedDimensions = null;
+
   #boundFocusin = this.focusin.bind(this);
 
   #boundFocusout = this.focusout.bind(this);
+
+  #focusedResizerName = "";
 
   #hasBeenClicked = false;
 
   #isEditing = false;
 
   #isInEditMode = false;
+
+  #isResizerEnabledForKeyboard = false;
 
   #moveInDOMTimeout = null;
 
@@ -82,6 +95,39 @@ class AnnotationEditor {
   // When one of the dimensions of an editor is smaller than this value, the
   // button to edit the alt text is visually moved outside of the editor.
   static SMALL_EDITOR_SIZE = 0;
+
+  static get _resizerKeyboardManager() {
+    const resize = AnnotationEditor.prototype._resizeWithKeyboard;
+    const small = AnnotationEditorUIManager.TRANSLATE_SMALL;
+    const big = AnnotationEditorUIManager.TRANSLATE_BIG;
+
+    return shadow(
+      this,
+      "_resizerKeyboardManager",
+      new KeyboardManager([
+        [["ArrowLeft", "mac+ArrowLeft"], resize, { args: [-small, 0] }],
+        [
+          ["ctrl+ArrowLeft", "mac+shift+ArrowLeft"],
+          resize,
+          { args: [-big, 0] },
+        ],
+        [["ArrowRight", "mac+ArrowRight"], resize, { args: [small, 0] }],
+        [
+          ["ctrl+ArrowRight", "mac+shift+ArrowRight"],
+          resize,
+          { args: [big, 0] },
+        ],
+        [["ArrowUp", "mac+ArrowUp"], resize, { args: [0, -small] }],
+        [["ctrl+ArrowUp", "mac+shift+ArrowUp"], resize, { args: [0, -big] }],
+        [["ArrowDown", "mac+ArrowDown"], resize, { args: [0, small] }],
+        [["ctrl+ArrowDown", "mac+shift+ArrowDown"], resize, { args: [0, big] }],
+        [
+          ["Escape", "mac+Escape"],
+          AnnotationEditor.prototype._stopResizingWithKeyboard,
+        ],
+      ])
+    );
+  }
 
   /**
    * @param {AnnotationEditorParameters} parameters
@@ -155,6 +201,14 @@ class AnnotationEditor {
         "editor_alt_text_button_label",
         "editor_alt_text_edit_button_label",
         "editor_alt_text_decorative_tooltip",
+        "editor_resizer_label_topLeft",
+        "editor_resizer_label_topMiddle",
+        "editor_resizer_label_topRight",
+        "editor_resizer_label_middleRight",
+        "editor_resizer_label_bottomRight",
+        "editor_resizer_label_bottomMiddle",
+        "editor_resizer_label_bottomLeft",
+        "editor_resizer_label_middleLeft",
       ].map(str => [str, l10n.get(str)])
     );
     if (options?.strings) {
@@ -222,6 +276,13 @@ class AnnotationEditor {
     this.div?.classList.toggle("draggable", value);
   }
 
+  /**
+   * @returns {boolean} true if the editor handles the Enter key itself.
+   */
+  get isEnterHandled() {
+    return true;
+  }
+
   center() {
     const [pageWidth, pageHeight] = this.pageDimensions;
     switch (this.parentRotation) {
@@ -275,6 +336,9 @@ class AnnotationEditor {
     if (parent !== null) {
       this.pageIndex = parent.pageIndex;
       this.pageDimensions = parent.pageDimensions;
+    } else {
+      // The editor is being removed from the DOM, so we need to stop resizing.
+      this.#stopResizing();
     }
     this.parent = parent;
   }
@@ -598,19 +662,32 @@ class AnnotationEditor {
     }
     this.#resizersDiv = document.createElement("div");
     this.#resizersDiv.classList.add("resizers");
-    const classes = ["topLeft", "topRight", "bottomRight", "bottomLeft"];
-    if (!this._willKeepAspectRatio) {
-      classes.push("topMiddle", "middleRight", "bottomMiddle", "middleLeft");
-    }
+    // When the resizers are used with the keyboard, they're focusable, hence
+    // we want to have them in this order (top left, top middle, top right, ...)
+    // in the DOM to have the focus order correct.
+    const classes = this._willKeepAspectRatio
+      ? ["topLeft", "topRight", "bottomRight", "bottomLeft"]
+      : [
+          "topLeft",
+          "topMiddle",
+          "topRight",
+          "middleRight",
+          "bottomRight",
+          "bottomMiddle",
+          "bottomLeft",
+          "middleLeft",
+        ];
     for (const name of classes) {
       const div = document.createElement("div");
       this.#resizersDiv.append(div);
       div.classList.add("resizer", name);
+      div.setAttribute("data-resizer-name", name);
       div.addEventListener(
         "pointerdown",
         this.#resizerPointerdown.bind(this, name)
       );
       div.addEventListener("contextmenu", noContextMenu);
+      div.tabIndex = -1;
     }
     this.div.prepend(this.#resizersDiv);
   }
@@ -657,45 +734,49 @@ class AnnotationEditor {
       this.parent.div.style.cursor = savedParentCursor;
       this.div.style.cursor = savedCursor;
 
-      const newX = this.x;
-      const newY = this.y;
-      const newWidth = this.width;
-      const newHeight = this.height;
-      if (
-        newX === savedX &&
-        newY === savedY &&
-        newWidth === savedWidth &&
-        newHeight === savedHeight
-      ) {
-        return;
-      }
-
-      this.addCommands({
-        cmd: () => {
-          this.width = newWidth;
-          this.height = newHeight;
-          this.x = newX;
-          this.y = newY;
-          const [parentWidth, parentHeight] = this.parentDimensions;
-          this.setDims(parentWidth * newWidth, parentHeight * newHeight);
-          this.fixAndSetPosition();
-        },
-        undo: () => {
-          this.width = savedWidth;
-          this.height = savedHeight;
-          this.x = savedX;
-          this.y = savedY;
-          const [parentWidth, parentHeight] = this.parentDimensions;
-          this.setDims(parentWidth * savedWidth, parentHeight * savedHeight);
-          this.fixAndSetPosition();
-        },
-        mustExec: true,
-      });
+      this.#addResizeToUndoStack(savedX, savedY, savedWidth, savedHeight);
     };
     window.addEventListener("pointerup", pointerUpCallback);
     // If the user switches to another window (with alt+tab), then we end the
     // resize session.
     window.addEventListener("blur", pointerUpCallback);
+  }
+
+  #addResizeToUndoStack(savedX, savedY, savedWidth, savedHeight) {
+    const newX = this.x;
+    const newY = this.y;
+    const newWidth = this.width;
+    const newHeight = this.height;
+    if (
+      newX === savedX &&
+      newY === savedY &&
+      newWidth === savedWidth &&
+      newHeight === savedHeight
+    ) {
+      return;
+    }
+
+    this.addCommands({
+      cmd: () => {
+        this.width = newWidth;
+        this.height = newHeight;
+        this.x = newX;
+        this.y = newY;
+        const [parentWidth, parentHeight] = this.parentDimensions;
+        this.setDims(parentWidth * newWidth, parentHeight * newHeight);
+        this.fixAndSetPosition();
+      },
+      undo: () => {
+        this.width = savedWidth;
+        this.height = savedHeight;
+        this.x = savedX;
+        this.y = savedY;
+        const [parentWidth, parentHeight] = this.parentDimensions;
+        this.setDims(parentWidth * savedWidth, parentHeight * savedHeight);
+        this.fixAndSetPosition();
+      },
+      mustExec: true,
+    });
   }
 
   #resizerPointermove(name, event) {
@@ -840,18 +921,17 @@ class AnnotationEditor {
     altText.tabIndex = "0";
     altText.addEventListener("contextmenu", noContextMenu);
     altText.addEventListener("pointerdown", event => event.stopPropagation());
-    altText.addEventListener(
-      "click",
-      event => {
-        event.preventDefault();
-        this._uiManager.editAltText(this);
-      },
-      { capture: true }
-    );
+
+    const onClick = event => {
+      this.#altTextButton.hidden = true;
+      event.preventDefault();
+      this._uiManager.editAltText(this);
+    };
+    altText.addEventListener("click", onClick, { capture: true });
     altText.addEventListener("keydown", event => {
       if (event.target === altText && event.key === "Enter") {
-        event.preventDefault();
-        this._uiManager.editAltText(this);
+        this.#altTextWasFromKeyBoard = true;
+        onClick(event);
       }
     });
     this.#setAltTextButtonState();
@@ -877,12 +957,13 @@ class AnnotationEditor {
       this.#altTextTooltip?.remove();
       return;
     }
+    button.classList.add("done");
+
     AnnotationEditor._l10nPromise
       .get("editor_alt_text_edit_button_label")
       .then(msg => {
         button.setAttribute("aria-label", msg);
       });
-
     let tooltip = this.#altTextTooltip;
     if (!tooltip) {
       this.#altTextTooltip = tooltip = document.createElement("span");
@@ -916,7 +997,6 @@ class AnnotationEditor {
         this.#altTextTooltip?.classList.remove("show");
       });
     }
-    button.classList.add("done");
     tooltip.innerText = this.#altTextDecorative
       ? await AnnotationEditor._l10nPromise.get(
           "editor_alt_text_decorative_tooltip"
@@ -926,6 +1006,9 @@ class AnnotationEditor {
     if (!tooltip.parentNode) {
       button.append(tooltip);
     }
+
+    const element = this.getImageForAltText();
+    element?.setAttribute("aria-describedby", tooltip.id);
   }
 
   #toggleAltTextButton(enabled = false) {
@@ -939,6 +1022,15 @@ class AnnotationEditor {
     this.#altTextButton.disabled = !enabled;
   }
 
+  altTextFinish() {
+    if (!this.#altTextButton) {
+      return;
+    }
+    this.#altTextButton.hidden = false;
+    this.#altTextButton.focus({ focusVisible: this.#altTextWasFromKeyBoard });
+    this.#altTextWasFromKeyBoard = false;
+  }
+
   getClientDimensions() {
     return this.div.getBoundingClientRect();
   }
@@ -950,6 +1042,9 @@ class AnnotationEditor {
     };
   }
 
+  /**
+   * Set the alt text data.
+   */
   set altTextData({ altText, decorative }) {
     if (this.#altText === altText && this.#altTextDecorative === decorative) {
       return;
@@ -1189,12 +1284,12 @@ class AnnotationEditor {
   }
 
   /**
-   * If it returns true, then this editor handle the keyboard
+   * If it returns true, then this editor handles the keyboard
    * events itself.
    * @returns {boolean}
    */
   shouldGetKeyboardEvents() {
-    return false;
+    return this.#isResizerEnabledForKeyboard;
   }
 
   /**
@@ -1287,6 +1382,7 @@ class AnnotationEditor {
       clearTimeout(this.#moveInDOMTimeout);
       this.#moveInDOMTimeout = null;
     }
+    this.#stopResizing();
   }
 
   /**
@@ -1303,7 +1399,139 @@ class AnnotationEditor {
     if (this.isResizable) {
       this.#createResizers();
       this.#resizersDiv.classList.remove("hidden");
+      bindEvents(this, this.div, ["keydown"]);
     }
+  }
+
+  /**
+   * onkeydown callback.
+   * @param {KeyboardEvent} event
+   */
+  keydown(event) {
+    if (
+      !this.isResizable ||
+      event.target !== this.div ||
+      event.key !== "Enter"
+    ) {
+      return;
+    }
+    this._uiManager.setSelected(this);
+    this.#savedDimensions = {
+      savedX: this.x,
+      savedY: this.y,
+      savedWidth: this.width,
+      savedHeight: this.height,
+    };
+    const children = this.#resizersDiv.children;
+    if (!this.#allResizerDivs) {
+      this.#allResizerDivs = Array.from(children);
+      const boundResizerKeydown = this.#resizerKeydown.bind(this);
+      const boundResizerBlur = this.#resizerBlur.bind(this);
+      for (const div of this.#allResizerDivs) {
+        const name = div.getAttribute("data-resizer-name");
+        div.setAttribute("role", "spinbutton");
+        div.addEventListener("keydown", boundResizerKeydown);
+        div.addEventListener("blur", boundResizerBlur);
+        div.addEventListener("focus", this.#resizerFocus.bind(this, name));
+        AnnotationEditor._l10nPromise
+          .get(`editor_resizer_label_${name}`)
+          .then(msg => div.setAttribute("aria-label", msg));
+      }
+    }
+
+    // We want to have the resizers in the visual order, so we move the first
+    // (top-left) to the right place.
+    const first = this.#allResizerDivs[0];
+    let firstPosition = 0;
+    for (const div of children) {
+      if (div === first) {
+        break;
+      }
+      firstPosition++;
+    }
+    const nextFirstPosition =
+      (((360 - this.rotation + this.parentRotation) % 360) / 90) *
+      (this.#allResizerDivs.length / 4);
+
+    if (nextFirstPosition !== firstPosition) {
+      // We need to reorder the resizers in the DOM in order to have the focus
+      // on the top-left one.
+      if (nextFirstPosition < firstPosition) {
+        for (let i = 0; i < firstPosition - nextFirstPosition; i++) {
+          this.#resizersDiv.append(this.#resizersDiv.firstChild);
+        }
+      } else if (nextFirstPosition > firstPosition) {
+        for (let i = 0; i < nextFirstPosition - firstPosition; i++) {
+          this.#resizersDiv.firstChild.before(this.#resizersDiv.lastChild);
+        }
+      }
+
+      let i = 0;
+      for (const child of children) {
+        const div = this.#allResizerDivs[i++];
+        const name = div.getAttribute("data-resizer-name");
+        AnnotationEditor._l10nPromise
+          .get(`editor_resizer_label_${name}`)
+          .then(msg => child.setAttribute("aria-label", msg));
+      }
+    }
+
+    this.#setResizerTabIndex(0);
+    this.#isResizerEnabledForKeyboard = true;
+    this.#resizersDiv.firstChild.focus({ focusVisible: true });
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+
+  #resizerKeydown(event) {
+    AnnotationEditor._resizerKeyboardManager.exec(this, event);
+  }
+
+  #resizerBlur(event) {
+    if (
+      this.#isResizerEnabledForKeyboard &&
+      event.relatedTarget?.parentNode !== this.#resizersDiv
+    ) {
+      this.#stopResizing();
+    }
+  }
+
+  #resizerFocus(name) {
+    this.#focusedResizerName = this.#isResizerEnabledForKeyboard ? name : "";
+  }
+
+  #setResizerTabIndex(value) {
+    if (!this.#allResizerDivs) {
+      return;
+    }
+    for (const div of this.#allResizerDivs) {
+      div.tabIndex = value;
+    }
+  }
+
+  _resizeWithKeyboard(x, y) {
+    if (!this.#isResizerEnabledForKeyboard) {
+      return;
+    }
+    this.#resizerPointermove(this.#focusedResizerName, {
+      movementX: x,
+      movementY: y,
+    });
+  }
+
+  #stopResizing() {
+    this.#isResizerEnabledForKeyboard = false;
+    this.#setResizerTabIndex(-1);
+    if (this.#savedDimensions) {
+      const { savedX, savedY, savedWidth, savedHeight } = this.#savedDimensions;
+      this.#addResizeToUndoStack(savedX, savedY, savedWidth, savedHeight);
+      this.#savedDimensions = null;
+    }
+  }
+
+  _stopResizingWithKeyboard() {
+    this.#stopResizing();
+    this.div.focus();
   }
 
   /**
@@ -1358,6 +1586,13 @@ class AnnotationEditor {
    * The editor is about to be edited.
    */
   enterInEditMode() {}
+
+  /**
+   * @returns {HTMLElement | null} the element requiring an alt text.
+   */
+  getImageForAltText() {
+    return null;
+  }
 
   /**
    * Get the div which really contains the displayed content.
