@@ -2007,7 +2007,7 @@ if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
     // We will rely on blob URL's property to specify origin.
     // We want this function to fail in case if createObjectURL or Blob do not
     // exist or fail for some reason -- our Worker creation will fail anyway.
-    const wrapper = `importScripts("${url}");`;
+    const wrapper = `await import("${url}");`;
     return URL.createObjectURL(new Blob([wrapper]));
   };
 }
@@ -2306,7 +2306,7 @@ class PDFWorker {
       const worker =
         typeof PDFJSDev === "undefined"
           ? await import("pdfjs/pdf.worker.js")
-          : await __non_webpack_import__(this.workerSrc); // eslint-disable-line no-undef
+          : await __non_webpack_import__(this.workerSrc);
       return worker.WorkerMessageHandler;
     };
 
@@ -2766,6 +2766,11 @@ class WorkerTransport {
 
       const pageProxy = this.#pageCache.get(pageIndex);
       if (pageProxy.objs.has(id)) {
+        return;
+      }
+      // Don't store data *after* cleanup has successfully run, see bug 1854145.
+      if (pageProxy._intentStates.size === 0) {
+        imageData?.bitmap?.close(); // Release any `ImageBitmap` data.
         return;
       }
 
