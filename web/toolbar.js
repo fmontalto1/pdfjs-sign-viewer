@@ -13,15 +13,14 @@
  * limitations under the License.
  */
 
+import { AnnotationEditorType, noContextMenu } from "pdfjs-lib";
 import {
-  animationStarted,
   DEFAULT_SCALE,
   DEFAULT_SCALE_VALUE,
   MAX_SCALE,
   MIN_SCALE,
   toggleCheckedBtn,
 } from "./ui_utils.js";
-import { AnnotationEditorType, noContextMenu } from "pdfjs-lib";
 
 const PAGE_NUMBER_LOADING_INDICATOR = "visiblePageIsLoading";
 
@@ -47,8 +46,6 @@ const PAGE_NUMBER_LOADING_INDICATOR = "visiblePageIsLoading";
  */
 
 class Toolbar {
-  #wasLocalized = false;
-
   /**
    * @param {ToolbarOptions} options
    * @param {EventBus} eventBus
@@ -207,12 +204,6 @@ class Toolbar {
     // Suppress context menus for some controls.
     scaleSelect.oncontextmenu = noContextMenu;
 
-    this.eventBus._on("localized", () => {
-      this.#wasLocalized = true;
-      this.#adjustScaleWidth();
-      this.#updateUIState(true);
-    });
-
     this.#bindEditorToolsListener(options);
   }
 
@@ -256,10 +247,6 @@ class Toolbar {
   }
 
   #updateUIState(resetNumPages = false) {
-    if (!this.#wasLocalized) {
-      // Don't update the UI state until we localize the toolbar.
-      return;
-    }
     const { pageNumber, pagesCount, pageScaleValue, pageScale, items } = this;
 
     if (resetNumPages) {
@@ -267,7 +254,7 @@ class Toolbar {
         items.pageNumber.type = "text";
       } else {
         items.pageNumber.type = "number";
-        this.l10n.get("of_pages", { pagesCount }).then(msg => {
+        this.l10n.get("pdfjs-of-pages", { pagesCount }).then(msg => {
           items.numPages.textContent = msg;
         });
       }
@@ -276,9 +263,11 @@ class Toolbar {
 
     if (this.hasPageLabels) {
       items.pageNumber.value = this.pageLabel;
-      this.l10n.get("page_of_pages", { pageNumber, pagesCount }).then(msg => {
-        items.numPages.textContent = msg;
-      });
+      this.l10n
+        .get("pdfjs-page-of-pages", { pageNumber, pagesCount })
+        .then(msg => {
+          items.numPages.textContent = msg;
+        });
     } else {
       items.pageNumber.value = pageNumber;
     }
@@ -290,7 +279,9 @@ class Toolbar {
     items.zoomIn.disabled = pageScale >= MAX_SCALE;
 
     this.l10n
-      .get("page_scale_percent", { scale: Math.round(pageScale * 10000) / 100 })
+      .get("pdfjs-page-scale-percent", {
+        scale: Math.round(pageScale * 10000) / 100,
+      })
       .then(msg => {
         let predefinedValueFound = false;
         for (const option of items.scaleSelect.options) {
@@ -312,52 +303,6 @@ class Toolbar {
     const { pageNumber } = this.items;
 
     pageNumber.classList.toggle(PAGE_NUMBER_LOADING_INDICATOR, loading);
-  }
-
-  /**
-   * Increase the width of the zoom dropdown DOM element if, and only if, it's
-   * too narrow to fit the *longest* of the localized strings.
-   */
-  async #adjustScaleWidth() {
-    const { items, l10n } = this;
-
-    const predefinedValuesPromise = Promise.all([
-      l10n.get("page_scale_auto"),
-      l10n.get("page_scale_actual"),
-      l10n.get("page_scale_fit"),
-      l10n.get("page_scale_width"),
-    ]);
-    await animationStarted;
-
-    const style = getComputedStyle(items.scaleSelect);
-    const scaleSelectWidth = parseFloat(
-      style.getPropertyValue("--scale-select-width")
-    );
-
-    // The temporary canvas is used to measure text length in the DOM.
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d", { alpha: false });
-    ctx.font = `${style.fontSize} ${style.fontFamily}`;
-
-    let maxWidth = 0;
-    for (const predefinedValue of await predefinedValuesPromise) {
-      const { width } = ctx.measureText(predefinedValue);
-      if (width > maxWidth) {
-        maxWidth = width;
-      }
-    }
-    // Account for the icon width, and ensure that there's always some spacing
-    // between the text and the icon.
-    maxWidth += 0.3 * scaleSelectWidth;
-
-    if (maxWidth > scaleSelectWidth) {
-      const container = items.scaleSelect.parentNode;
-      container.style.setProperty("--scale-select-width", `${maxWidth}px`);
-    }
-    // Zeroing the width and height cause Firefox to release graphics resources
-    // immediately, which can greatly reduce memory consumption.
-    canvas.width = 0;
-    canvas.height = 0;
   }
 }
 

@@ -13,20 +13,6 @@
  * limitations under the License.
  */
 
-const NodeCanvasFactory = null;
-const NodeCMapReaderFactory = null;
-const NodeFilterFactory = null;
-const NodeStandardFontDataFactory = null;
-const PDFFetchStream = null;
-const PDFNetworkStream = null;
-const PDFNodeStream = null;
+const NullL10n = null;
 
-export {
-  NodeCanvasFactory,
-  NodeCMapReaderFactory,
-  NodeFilterFactory,
-  NodeStandardFontDataFactory,
-  PDFFetchStream,
-  PDFNetworkStream,
-  PDFNodeStream,
-};
+export { NullL10n };

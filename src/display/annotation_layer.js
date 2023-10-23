@@ -41,7 +41,6 @@ import {
 } from "./display_utils.js";
 import { AnnotationStorage } from "./annotation_storage.js";
 import { ColorConverters } from "../shared/scripting_utils.js";
-import { NullL10n } from "display-l10n_utils";
 import { XfaLayer } from "./xfa_layer.js";
 
 const DEFAULT_TAB_INDEX = 1000;
@@ -806,7 +805,6 @@ class LinkAnnotationElement extends AnnotationElement {
     link.href = this.linkService.getAnchorUrl("");
     link.onclick = () => {
       this.downloadManager?.openOrDownloadData(
-        this.container,
         attachment.content,
         attachment.filename,
         dest
@@ -985,8 +983,7 @@ class TextAnnotationElement extends AnnotationElement {
       "annotation-" +
       this.data.name.toLowerCase() +
       ".svg";
-    image.alt = "[{{type}} Annotation]";
-    image.dataset.l10nId = "text_annotation_type";
+    image.dataset.l10nId = "pdfjs-text-annotation-type";
     image.dataset.l10nArgs = JSON.stringify({ type: this.data.name });
 
     if (!this.data.popupRef && this.hasPopupData) {
@@ -2053,8 +2050,6 @@ class PopupAnnotationElement extends AnnotationElement {
 }
 
 class PopupElement {
-  #dateTimePromise = null;
-
   #boundKeyDown = this.#keyDown.bind(this);
 
   #boundHide = this.#hide.bind(this);
@@ -2068,6 +2063,8 @@ class PopupElement {
   #container = null;
 
   #contentsObj = null;
+
+  #dateObj = null;
 
   #elements = null;
 
@@ -2110,16 +2107,10 @@ class PopupElement {
     this.#parentRect = parentRect;
     this.#elements = elements;
 
-    const dateObject = PDFDateString.toDateObject(modificationDate);
-    if (dateObject) {
-      // The modification date is shown in the popup instead of the creation
-      // date if it is available and can be parsed correctly, which is
-      // consistent with other viewers such as Adobe Acrobat.
-      this.#dateTimePromise = parent.l10n.get("annotation_date_string", {
-        date: dateObject.toLocaleDateString(),
-        time: dateObject.toLocaleTimeString(),
-      });
-    }
+    // The modification date is shown in the popup instead of the creation
+    // date if it is available and can be parsed correctly, which is
+    // consistent with other viewers such as Adobe Acrobat.
+    this.#dateObj = PDFDateString.toDateObject(modificationDate);
 
     this.trigger = elements.flatMap(e => e.getElementsToTriggerPopup());
     // Attach the event listeners to the trigger element.
@@ -2146,9 +2137,6 @@ class PopupElement {
       this.#parent.popupShow.push(async () => {
         if (this.#container.hidden) {
           this.#show();
-        }
-        if (this.#dateTimePromise) {
-          await this.#dateTimePromise;
         }
       });
     }
@@ -2198,11 +2186,13 @@ class PopupElement {
     ({ dir: title.dir, str: title.textContent } = this.#titleObj);
     popup.append(header);
 
-    if (this.#dateTimePromise) {
+    if (this.#dateObj) {
       const modificationDate = document.createElement("span");
       modificationDate.classList.add("popupDate");
-      this.#dateTimePromise.then(localized => {
-        modificationDate.textContent = localized;
+      modificationDate.dataset.l10nId = "pdfjs-annotation-date-string";
+      modificationDate.dataset.l10nArgs = JSON.stringify({
+        date: this.#dateObj.toLocaleDateString(),
+        time: this.#dateObj.toLocaleTimeString(),
       });
       header.append(modificationDate);
     }
@@ -2892,11 +2882,7 @@ class FileAttachmentAnnotationElement extends AnnotationElement {
    * Download the file attachment associated with this annotation.
    */
   #download() {
-    this.downloadManager?.openOrDownloadData(
-      this.container,
-      this.content,
-      this.filename
-    );
+    this.downloadManager?.openOrDownloadData(this.content, this.filename);
   }
 }
 
@@ -2946,12 +2932,6 @@ class AnnotationLayer {
     this.viewport = viewport;
     this.zIndex = 0;
 
-    if (
-      typeof PDFJSDev !== "undefined" &&
-      PDFJSDev.test("GENERIC && !TESTING")
-    ) {
-      this.l10n ||= NullL10n;
-    }
     if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("TESTING")) {
       // For testing purposes.
       Object.defineProperty(this, "showPopups", {
@@ -3052,8 +3032,6 @@ class AnnotationLayer {
     }
 
     this.#setAnnotationCanvasMap();
-
-    await this.l10n.translate(layer);
   }
 
   /**

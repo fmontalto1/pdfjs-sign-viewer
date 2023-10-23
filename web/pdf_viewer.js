@@ -63,7 +63,7 @@ import {
   VERTICAL_PADDING,
   watchScroll,
 } from "./ui_utils.js";
-import { NullL10n } from "./l10n_utils.js";
+import { NullL10n } from "web-l10n_utils";
 import { PDFPageView } from "./pdf_page_view.js";
 import { PDFRenderingQueue } from "./pdf_rendering_queue.js";
 import { SimpleLinkService } from "./pdf_link_service.js";
@@ -322,6 +322,14 @@ class PDFViewer {
         pdfPage?.cleanup();
       }
     });
+
+    if (
+      (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) &&
+      this.l10n === NullL10n
+    ) {
+      // Ensure that Fluent is connected in e.g. the COMPONENTS build.
+      this.l10n.translate(this.container);
+    }
   }
 
   get pagesCount() {

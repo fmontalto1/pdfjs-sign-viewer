@@ -42,7 +42,7 @@ import {
 import { AnnotationEditorLayerBuilder } from "./annotation_editor_layer_builder.js";
 import { AnnotationLayerBuilder } from "./annotation_layer_builder.js";
 import { compatibilityParams } from "./app_options.js";
-import { NullL10n } from "./l10n_utils.js";
+import { NullL10n } from "web-l10n_utils";
 import { SimpleLinkService } from "./pdf_link_service.js";
 import { StructTreeLayerBuilder } from "./struct_tree_layer_builder.js";
 import { TextAccessibilityManager } from "./text_accessibility.js";
@@ -182,7 +182,7 @@ class PDFPageView {
     div.className = "page";
     div.setAttribute("data-page-number", this.id);
     div.setAttribute("role", "region");
-    this.l10n.get("page_landmark", { page: this.id }).then(msg => {
+    this.l10n.get("pdfjs-page-landmark", { page: this.id }).then(msg => {
       div.setAttribute("aria-label", msg);
     });
     this.div = div;
@@ -214,6 +214,11 @@ class PDFPageView {
           this.#useThumbnailCanvas.initialOptionalContent =
             optionalContentConfig.hasInitialVisibility;
         });
+      }
+
+      // Ensure that Fluent is connected in e.g. the COMPONENTS build.
+      if (this.l10n === NullL10n) {
+        this.l10n.translate(this.div);
       }
     }
   }
