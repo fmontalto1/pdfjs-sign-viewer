@@ -61,7 +61,6 @@ const MINIFIED_DIR = BUILD_DIR + "minified/";
 const MINIFIED_LEGACY_DIR = BUILD_DIR + "minified-legacy/";
 const JSDOC_BUILD_DIR = BUILD_DIR + "jsdoc/";
 const GH_PAGES_DIR = BUILD_DIR + "gh-pages/";
-const SRC_DIR = "src/";
 const DIST_DIR = BUILD_DIR + "dist/";
 const TYPES_DIR = BUILD_DIR + "types/";
 const TMP_DIR = BUILD_DIR + "tmp/";
@@ -217,7 +216,7 @@ function createWebpackConfig(
         [
           "@babel/preset-env",
           {
-            corejs: "3.33.0",
+            corejs: "3.33.1",
             exclude: ["web.structured-clone"],
             shippedProposals: true,
             useBuiltIns: "usage",
@@ -1829,7 +1828,6 @@ gulp.task(
           .src([
             GENERIC_DIR + "build/pdf.mjs",
             GENERIC_DIR + "build/pdf.worker.mjs",
-            SRC_DIR + "pdf.worker.entry.js",
           ])
           .pipe(gulp.dest(TYPESTEST_DIR + "build/")),
         gulp
@@ -2010,6 +2008,13 @@ gulp.task(
 gulp.task(
   "server",
   gulp.parallel(
+    function watchLocale() {
+      gulp.watch(
+        "l10n/**/*.ftl",
+        { ignoreInitial: false },
+        gulp.series("locale")
+      );
+    },
     function watchDevSandbox() {
       gulp.watch(
         [
@@ -2200,14 +2205,12 @@ gulp.task(
           .src([
             GENERIC_DIR + "build/{pdf,pdf.worker,pdf.sandbox}.mjs",
             GENERIC_DIR + "build/{pdf,pdf.worker,pdf.sandbox}.mjs.map",
-            SRC_DIR + "pdf.worker.entry.js",
           ])
           .pipe(gulp.dest(DIST_DIR + "build/")),
         gulp
           .src([
             GENERIC_LEGACY_DIR + "build/{pdf,pdf.worker,pdf.sandbox}.mjs",
             GENERIC_LEGACY_DIR + "build/{pdf,pdf.worker,pdf.sandbox}.mjs.map",
-            SRC_DIR + "pdf.worker.entry.js",
           ])
           .pipe(gulp.dest(DIST_DIR + "legacy/build/")),
         gulp

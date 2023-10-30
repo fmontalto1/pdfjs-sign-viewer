@@ -31,7 +31,7 @@ class L10n {
     this.#dir = isRTL ?? L10n.#isRTL(this.#lang) ? "rtl" : "ltr";
   }
 
-  setL10n(l10n) {
+  _setL10n(l10n) {
     this.#l10n = l10n;
     if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("TESTING")) {
       document.l10n = l10n;
@@ -73,6 +73,16 @@ class L10n {
     } catch {
       // Element is under an existing root, so there is no need to add it again.
     }
+  }
+
+  /** @inheritdoc */
+  pause() {
+    this.#l10n.pauseObserving();
+  }
+
+  /** @inheritdoc */
+  resume() {
+    this.#l10n.resumeObserving();
   }
 
   static #fixupLangCode(langCode) {

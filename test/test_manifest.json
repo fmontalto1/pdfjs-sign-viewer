@@ -8170,5 +8170,24 @@
       "rounds": 1,
       "type": "eq",
       "annotations": true
+   },
+   {
+      "id": "bug1860602",
+      "file": "pdfs/bug1860602.pdf",
+      "md5": "37de2fbd0a02c5a3ca27c6e75fea8932",
+      "rounds": 1,
+      "link": true,
+      "firstPage": 2,
+      "lastPage": 2,
+      "type": "eq",
+      "forms": true
+   },
+   {
+      "id": "issue17169",
+      "file": "pdfs/issue17169.pdf",
+      "md5": "fa57aa9442c5e2d6d9e61bbb8856a55f",
+      "link": true,
+      "rounds": 1,
+      "type": "eq"
    }
 ]
