@@ -734,7 +734,7 @@ class AnnotationEditorUIManager {
     this.#activeEditor = null;
     this.#selectedEditors.clear();
     this.#commandManager.destroy();
-    this.#altTextManager.destroy();
+    this.#altTextManager?.destroy();
   }
 
   get hcmFilter() {
