@@ -28,6 +28,7 @@
 
   --toolbar-icon-opacity: 0.7;
   --doorhanger-icon-opacity: 0.9;
+  --editor-toolbar-base-offset: 105px;
 
   --main-color: rgb(12 12 13);
   --body-bg-color: rgb(212 212 215);
@@ -45,6 +46,7 @@
   --toolbar-border-color: rgb(184 184 184);
   --toolbar-box-shadow: 0 1px 0 var(--toolbar-border-color);
   --toolbar-border-bottom: none;
+  --toolbar-height: 32px;
   --toolbarSidebar-box-shadow: inset calc(-1px * var(--dir-factor)) 0 0
       rgb(0 0 0 / 0.25),
     0 1px 0 rgb(0 0 0 / 0.15), 0 0 1px rgb(0 0 0 / 0.1);
@@ -80,6 +82,7 @@
   --treeitem-expanded-icon: url(images/treeitem-expanded.svg);
   --treeitem-collapsed-icon: url(images/treeitem-collapsed.svg);
   --toolbarButton-editorFreeText-icon: url(images/toolbarButton-editorFreeText.svg);
+  --toolbarButton-editorHighlight-icon: url(images/toolbarButton-editorHighlight.svg);
   --toolbarButton-editorInk-icon: url(images/toolbarButton-editorInk.svg);
   --toolbarButton-editorStamp-icon: url(images/toolbarButton-editorStamp.svg);
   --toolbarButton-menuArrow-icon: url(images/toolbarButton-menuArrow.svg);
@@ -117,6 +120,9 @@
   --secondaryToolbarButton-spreadNone-icon: url(images/secondaryToolbarButton-spreadNone.svg);
   --secondaryToolbarButton-spreadOdd-icon: url(images/secondaryToolbarButton-spreadOdd.svg);
   --secondaryToolbarButton-spreadEven-icon: url(images/secondaryToolbarButton-spreadEven.svg);
+  --secondaryToolbarButton-imageAltTextSettings-icon: var(
+    --toolbarButton-editorStamp-icon
+  );
   --secondaryToolbarButton-documentProperties-icon: url(images/secondaryToolbarButton-documentProperties.svg);
   --editorParams-stampAddImage-icon: url(images/toolbarButton-zoomIn.svg);
 }
@@ -168,11 +174,6 @@
     --doorhanger-separator-color: rgb(92 92 97);
     --dialog-button-bg-color: rgb(92 92 97);
     --dialog-button-hover-bg-color: rgb(115 115 115);
-
-    /* This image is used in <input> elements, which unfortunately means that
-     * the `mask-image` approach used with all of the other images doesn't work
-     * here; hence why we still have two versions of this particular image. */
-    --loading-icon: url(images/loading-dark.svg);
   }
 }
 
@@ -226,6 +227,15 @@ body {
 body {
   background-color: var(--body-bg-color);
   scrollbar-color: var(--scrollbar-color) var(--scrollbar-bg-color);
+
+  &.wait::before {
+    content: "";
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    z-index: 100000;
+    cursor: wait;
+  }
 }
 
 .hidden,
@@ -264,7 +274,7 @@ body {
 
 #sidebarContainer {
   position: absolute;
-  inset-block: 32px 0;
+  inset-block: var(--toolbar-height) 0;
   inset-inline-start: calc(-1 * var(--sidebar-width));
   width: var(--sidebar-width);
   visibility: hidden;
@@ -291,7 +301,7 @@ body {
 }
 
 #sidebarContent {
-  inset-block: 32px 0;
+  inset-block: var(--toolbar-height) 0;
   inset-inline-start: 0;
   overflow: auto;
   position: absolute;
@@ -302,7 +312,7 @@ body {
 #viewerContainer {
   overflow: auto;
   position: absolute;
-  inset: 32px 0 0;
+  inset: var(--toolbar-height) 0 0;
   outline: none;
 }
 #viewerContainer:not(.pdfPresentationMode) {
@@ -336,7 +346,7 @@ body {
 
 #toolbarSidebar {
   width: 100%;
-  height: 32px;
+  height: var(--toolbar-height);
   background-color: var(--sidebar-toolbar-bg-color);
   box-shadow: var(--toolbarSidebar-box-shadow);
   border-bottom: var(--toolbarSidebar-border-bottom);
@@ -356,14 +366,14 @@ body {
 .secondaryToolbar,
 .editorParamsToolbar {
   position: relative;
-  height: 32px;
+  height: var(--toolbar-height);
   background-color: var(--toolbar-bg-color);
   box-shadow: var(--toolbar-box-shadow);
   border-bottom: var(--toolbar-border-bottom);
 }
 
 #toolbarViewer {
-  height: 32px;
+  height: var(--toolbar-height);
 }
 
 #loadingBar {
@@ -441,7 +451,7 @@ body {
 .findbar,
 .secondaryToolbar,
 .editorParamsToolbar {
-  top: 32px;
+  top: var(--toolbar-height);
   position: absolute;
   z-index: 30000;
   height: auto;
@@ -460,7 +470,7 @@ body {
   background-color: var(--toolbar-bg-color);
 }
 .findbar > div {
-  height: 32px;
+  height: var(--toolbar-height);
 }
 .findbar > div#findbarInputContainer {
   margin-inline-end: 4px;
@@ -494,22 +504,22 @@ body {
 
 #findInput {
   width: 200px;
-}
-/*#if !MOZCENTRAL*/
-#findInput::-webkit-input-placeholder {
-  color: rgb(191 191 191);
-}
-/*#endif*/
-#findInput::placeholder {
-  font-style: normal;
-}
-#findInput[data-status="pending"] {
-  background-image: var(--loading-icon);
-  background-repeat: no-repeat;
-  background-position: calc(50% + 48% * var(--dir-factor));
-}
-#findInput[data-status="notFound"] {
-  background-color: rgb(255 102 102);
+
+  /*#if !MOZCENTRAL*/
+  &::-webkit-input-placeholder {
+    color: rgb(191 191 191);
+  }
+  /*#endif*/
+  &::placeholder {
+    font-style: normal;
+  }
+  .loadingInput:has(> &[data-status="pending"])::after {
+    display: block;
+    visibility: visible;
+  }
+  &[data-status="notFound"] {
+    background-color: rgb(255 102 102);
+  }
 }
 
 .secondaryToolbar,
@@ -536,6 +546,11 @@ body {
 .editorParamsToolbarContainer .editorParamsLabel {
   padding-inline-end: 10px;
   flex: none;
+  font: menu;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 150%;
   color: var(--main-color);
 }
 
@@ -578,18 +593,19 @@ body {
 }
 
 #editorStampParamsToolbar {
-  inset-inline-end: 40px;
-  background-color: var(--toolbar-bg-color);
+  inset-inline-end: calc(var(--editor-toolbar-base-offset) + 0px);
 }
 
 #editorInkParamsToolbar {
-  inset-inline-end: 68px;
-  background-color: var(--toolbar-bg-color);
+  inset-inline-end: calc(var(--editor-toolbar-base-offset) + 28px);
 }
 
 #editorFreeTextParamsToolbar {
-  inset-inline-end: 96px;
-  background-color: var(--toolbar-bg-color);
+  inset-inline-end: calc(var(--editor-toolbar-base-offset) + 56px);
+}
+
+#editorHighlightParamsToolbar {
+  inset-inline-end: calc(var(--editor-toolbar-base-offset) + 84px);
 }
 
 #editorStampAddImage::before {
@@ -911,6 +927,10 @@ body {
   mask-image: var(--toolbarButton-editorFreeText-icon);
 }
 
+#editorHighlight::before {
+  mask-image: var(--toolbarButton-editorHighlight-icon);
+}
+
 #editorInk::before {
   mask-image: var(--toolbarButton-editorInk-icon);
 }
@@ -919,13 +939,12 @@ body {
   mask-image: var(--toolbarButton-editorStamp-icon);
 }
 
-#print::before,
-#secondaryPrint::before {
+:is(#print, #secondaryPrint)::before {
   mask-image: var(--toolbarButton-print-icon);
 }
 
 /*#if GENERIC*/
-:is(#openFile, #secondaryOpenFile)::before {
+#secondaryOpenFile::before {
   mask-image: var(--toolbarButton-openFile-icon);
 }
 /*#endif*/
@@ -1061,6 +1080,10 @@ a:is(.toolbarButton, .secondaryToolbarButton)[href="#"] {
   mask-image: var(--secondaryToolbarButton-documentProperties-icon);
 }
 
+#imageAltTextSettings::before {
+  mask-image: var(--secondaryToolbarButton-imageAltTextSettings-icon);
+}
+
 .verticalToolbarSeparator {
   display: block;
   margin: 5px 2px;
@@ -1104,22 +1127,44 @@ a:is(.toolbarButton, .secondaryToolbarButton)[href="#"] {
   width: 40px;
   background-size: 0 0;
   transition-property: none;
+
+  /*#if !MOZCENTRAL*/
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+  }
+  /*#endif*/
+
+  .loadingInput:has(> &.loading)::after {
+    display: block;
+    visibility: visible;
+
+    transition-property: visibility;
+    transition-delay: var(--loading-icon-delay);
+  }
 }
-#pageNumber.visiblePageIsLoading {
-  background-image: var(--loading-icon);
-  background-repeat: no-repeat;
-  background-position: calc(50% - 42% * var(--dir-factor));
-  background-size: 16px 16px;
-  /* Using a delay with background-image doesn't work,
-     consequently we use background-size. */
-  transition-property: background-size;
-  transition-delay: var(--loading-icon-delay);
+
+.loadingInput {
+  &::after {
+    position: absolute;
+    visibility: hidden;
+    display: none;
+    top: calc(50% - 8px);
+    width: 16px;
+    height: 16px;
+
+    content: "";
+    background-color: var(--toolbar-icon-bg-color);
+    mask-size: cover;
+    mask-image: var(--loading-icon);
+  }
+
+  &.start::after {
+    inset-inline-start: 4px;
+  }
+  &.end::after {
+    inset-inline-end: 4px;
+  }
 }
-/*#if !MOZCENTRAL*/
-#pageNumber::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-}
-/*#endif*/
 
 .toolbarField:focus {
   border-color: #0a84ff;
@@ -1274,6 +1319,14 @@ a:focus > .thumbnail > .thumbnailImage,
   background-clip: padding-box;
   border-radius: 2px;
   color: var(--treeitem-hover-color);
+}
+
+#outlineOptionsContainer {
+  display: none;
+
+  #sidebarContainer:has(#outlineView:not(.hidden)) & {
+    display: inherit;
+  }
 }
 
 .dialogButton {
@@ -1435,7 +1488,6 @@ dialog :link {
   }
 }
 
-.visibleLargeView,
 .visibleMediumView {
   display: none;
 }
@@ -1459,16 +1511,10 @@ dialog :link {
   }
 }
 
-@media all and (max-width: 820px) {
-  #outerContainer .hiddenLargeView {
-    display: none;
-  }
-  #outerContainer .visibleLargeView {
-    display: inherit;
-  }
-}
-
 @media all and (max-width: 750px) {
+  :root {
+    --editor-toolbar-base-offset: 40px;
+  }
   #outerContainer .hiddenMediumView {
     display: none;
   }

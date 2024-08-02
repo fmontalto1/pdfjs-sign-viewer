@@ -226,6 +226,23 @@ pdfjs-find-match-diacritics-checkbox-label = С учётом диакритич�
 pdfjs-find-entire-word-checkbox-label = Слова целиком
 pdfjs-find-reached-top = Достигнут верх документа, продолжено снизу
 pdfjs-find-reached-bottom = Достигнут конец документа, продолжено сверху
+# Variables:
+#   $current (Number) - the index of the currently active find result
+#   $total (Number) - the total number of matches in the document
+pdfjs-find-match-count =
+    { $total ->
+        [one] { $current } из { $total } совпадения
+        [few] { $current } из { $total } совпадений
+       *[many] { $current } из { $total } совпадений
+    }
+# Variables:
+#   $limit (Number) - the maximum number of matches
+pdfjs-find-match-count-limit =
+    { $limit ->
+        [one] Более { $limit } совпадения
+        [few] Более { $limit } совпадений
+       *[many] Более { $limit } совпадений
+    }
 pdfjs-find-not-found = Фраза не найдена
 
 ## Predefined zoom values
@@ -286,6 +303,29 @@ pdfjs-editor-ink-button-label = Рисовать
 pdfjs-editor-stamp-button =
     .title = Добавить или изменить изображения
 pdfjs-editor-stamp-button-label = Добавить или изменить изображения
+pdfjs-editor-highlight-button =
+    .title = Выделение
+pdfjs-editor-highlight-button-label = Выделение
+pdfjs-highlight-floating-button =
+    .title = Выделение
+pdfjs-highlight-floating-button1 =
+    .title = Выделение
+    .aria-label = Выделение
+pdfjs-highlight-floating-button-label = Выделение
+
+## Remove button for the various kind of editor.
+
+pdfjs-editor-remove-ink-button =
+    .title = Удалить рисунок
+pdfjs-editor-remove-freetext-button =
+    .title = Удалить текст
+pdfjs-editor-remove-stamp-button =
+    .title = Удалить изображение
+pdfjs-editor-remove-highlight-button =
+    .title = Удалить выделение
+
+##
+
 # Editor Parameters
 pdfjs-editor-free-text-color-input = Цвет
 pdfjs-editor-free-text-size-input = Размер
@@ -295,6 +335,10 @@ pdfjs-editor-ink-opacity-input = Прозрачность
 pdfjs-editor-stamp-add-image-button =
     .title = Добавить изображение
 pdfjs-editor-stamp-add-image-button-label = Добавить изображение
+# This refers to the thickness of the line used for free highlighting (not bound to text)
+pdfjs-editor-free-highlight-thickness-input = Толщина
+pdfjs-editor-free-highlight-thickness-title =
+    .title = Изменить толщину при выделении элементов, кроме текста
 pdfjs-free-text =
     .aria-label = Текстовый редактор
 pdfjs-free-text-default-content = Начните вводить…
@@ -332,3 +376,29 @@ pdfjs-editor-resizer-label-bottom-right = Нижний правый угол —
 pdfjs-editor-resizer-label-bottom-middle = Внизу посередине — изменить размер
 pdfjs-editor-resizer-label-bottom-left = Нижний левый угол — изменить размер
 pdfjs-editor-resizer-label-middle-left = В центре слева — изменить размер
+
+## Color picker
+
+# This means "Color used to highlight text"
+pdfjs-editor-highlight-colorpicker-label = Цвет выделения
+pdfjs-editor-colorpicker-button =
+    .title = Изменить цвет
+pdfjs-editor-colorpicker-dropdown =
+    .aria-label = Выбор цвета
+pdfjs-editor-colorpicker-yellow =
+    .title = Жёлтый
+pdfjs-editor-colorpicker-green =
+    .title = Зелёный
+pdfjs-editor-colorpicker-blue =
+    .title = Синий
+pdfjs-editor-colorpicker-pink =
+    .title = Розовый
+pdfjs-editor-colorpicker-red =
+    .title = Красный
+
+## Show all highlights
+## This is a toggle button to show/hide all the highlights.
+
+pdfjs-editor-highlight-show-all-button-label = Показать все
+pdfjs-editor-highlight-show-all-button =
+    .title = Показать все

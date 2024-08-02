@@ -51,12 +51,6 @@ pdfjs-download-button-label = ダウンロード
 pdfjs-bookmark-button =
     .title = 現在のページの URL です (現在のページを表示する URL)
 pdfjs-bookmark-button-label = 現在のページ
-# Used in Firefox for Android.
-pdfjs-open-in-app-button =
-    .title = アプリで開く
-# Used in Firefox for Android.
-# Length of the translation matters since we are in a mobile context, with limited screen estate.
-pdfjs-open-in-app-button-label = アプリで開く
 
 ##  Secondary toolbar and context menu
 
@@ -226,6 +220,21 @@ pdfjs-find-match-diacritics-checkbox-label = 発音区別符号を区別
 pdfjs-find-entire-word-checkbox-label = 単語一致
 pdfjs-find-reached-top = 文書先頭に到達したので末尾から続けて検索します
 pdfjs-find-reached-bottom = 文書末尾に到達したので先頭から続けて検索します
+# Variables:
+#   $current (Number) - the index of the currently active find result
+#   $total (Number) - the total number of matches in the document
+pdfjs-find-match-count =
+    { $total ->
+        [one] { $total } 件中 { $current } 件目
+       *[other] { $total } 件中 { $current } 件目
+    }
+# Variables:
+#   $limit (Number) - the maximum number of matches
+pdfjs-find-match-count-limit =
+    { $limit ->
+        [one] { $limit } 件以上一致
+       *[other] { $limit } 件以上一致
+    }
 pdfjs-find-not-found = 見つかりませんでした
 
 ## Predefined zoom values
@@ -270,7 +279,7 @@ pdfjs-text-annotation-type =
 ## Password
 
 pdfjs-password-label = この PDF ファイルを開くためのパスワードを入力してください。
-pdfjs-password-invalid = 無効なパスワードです。もう一度やり直してください。
+pdfjs-password-invalid = パスワードが正しくありません。もう一度試してください。
 pdfjs-password-ok-button = OK
 pdfjs-password-cancel-button = キャンセル
 pdfjs-web-fonts-disabled = ウェブフォントが無効になっています: 埋め込まれた PDF のフォントを使用できません。
@@ -278,14 +287,35 @@ pdfjs-web-fonts-disabled = ウェブフォントが無効になっています: 
 ## Editing
 
 pdfjs-editor-free-text-button =
-    .title = フリーテキスト注釈
+    .title = フリーテキスト注釈を追加します
 pdfjs-editor-free-text-button-label = フリーテキスト注釈
 pdfjs-editor-ink-button =
-    .title = インク注釈
+    .title = インク注釈を追加します
 pdfjs-editor-ink-button-label = インク注釈
 pdfjs-editor-stamp-button =
     .title = 画像を追加または編集します
 pdfjs-editor-stamp-button-label = 画像を追加または編集
+pdfjs-editor-highlight-button =
+    .title = 強調します
+pdfjs-editor-highlight-button-label = 強調
+pdfjs-highlight-floating-button1 =
+    .title = 強調
+    .aria-label = 強調します
+pdfjs-highlight-floating-button-label = 強調
+
+## Remove button for the various kind of editor.
+
+pdfjs-editor-remove-ink-button =
+    .title = インク注釈を削除します
+pdfjs-editor-remove-freetext-button =
+    .title = テキストを削除します
+pdfjs-editor-remove-stamp-button =
+    .title = 画像を削除します
+pdfjs-editor-remove-highlight-button =
+    .title = 強調を削除します
+
+##
+
 # Editor Parameters
 pdfjs-editor-free-text-color-input = 色
 pdfjs-editor-free-text-size-input = サイズ
@@ -295,6 +325,10 @@ pdfjs-editor-ink-opacity-input = 不透明度
 pdfjs-editor-stamp-add-image-button =
     .title = 画像を追加します
 pdfjs-editor-stamp-add-image-button-label = 画像を追加
+# This refers to the thickness of the line used for free highlighting (not bound to text)
+pdfjs-editor-free-highlight-thickness-input = 太さ
+pdfjs-editor-free-highlight-thickness-title =
+    .title = テキスト以外のアイテムを強調する時の太さを変更します
 pdfjs-free-text =
     .aria-label = フリーテキスト注釈エディター
 pdfjs-free-text-default-content = テキストを入力してください...
@@ -312,11 +346,11 @@ pdfjs-editor-alt-text-dialog-label = オプションの選択
 pdfjs-editor-alt-text-dialog-description = 代替テキストは画像が表示されない場合や読み込まれない場合にユーザーの助けになります。
 pdfjs-editor-alt-text-add-description-label = 説明を追加
 pdfjs-editor-alt-text-add-description-description = 対象や設定、動作を説明する短い文章を記入してください。
-pdfjs-editor-alt-text-mark-decorative-label = 飾りマークを付ける
-pdfjs-editor-alt-text-mark-decorative-description = これは区切り線やウォーターマークなど飾りの画像に使用されます。
+pdfjs-editor-alt-text-mark-decorative-label = 装飾マークを付ける
+pdfjs-editor-alt-text-mark-decorative-description = これは区切り線やウォーターマークなどの装飾画像に使用されます。
 pdfjs-editor-alt-text-cancel-button = キャンセル
 pdfjs-editor-alt-text-save-button = 保存
-pdfjs-editor-alt-text-decorative-tooltip = 飾りマークが付いています
+pdfjs-editor-alt-text-decorative-tooltip = 装飾マークが付いています
 # .placeholder: This is a placeholder for the alt text input area
 pdfjs-editor-alt-text-textarea =
     .placeholder = 例:「若い人がテーブルの席について食事をしています」
@@ -324,3 +358,37 @@ pdfjs-editor-alt-text-textarea =
 ## Editor resizers
 ## This is used in an aria label to help to understand the role of the resizer.
 
+pdfjs-editor-resizer-label-top-left = 左上隅 — サイズ変更
+pdfjs-editor-resizer-label-top-middle = 上中央 — サイズ変更
+pdfjs-editor-resizer-label-top-right = 右上隅 — サイズ変更
+pdfjs-editor-resizer-label-middle-right = 右中央 — サイズ変更
+pdfjs-editor-resizer-label-bottom-right = 右下隅 — サイズ変更
+pdfjs-editor-resizer-label-bottom-middle = 下中央 — サイズ変更
+pdfjs-editor-resizer-label-bottom-left = 左下隅 — サイズ変更
+pdfjs-editor-resizer-label-middle-left = 左中央 — サイズ変更
+
+## Color picker
+
+# This means "Color used to highlight text"
+pdfjs-editor-highlight-colorpicker-label = 強調色
+pdfjs-editor-colorpicker-button =
+    .title = 色を変更します
+pdfjs-editor-colorpicker-dropdown =
+    .aria-label = 色の選択
+pdfjs-editor-colorpicker-yellow =
+    .title = 黄色
+pdfjs-editor-colorpicker-green =
+    .title = 緑色
+pdfjs-editor-colorpicker-blue =
+    .title = 青色
+pdfjs-editor-colorpicker-pink =
+    .title = ピンク色
+pdfjs-editor-colorpicker-red =
+    .title = 赤色
+
+## Show all highlights
+## This is a toggle button to show/hide all the highlights.
+
+pdfjs-editor-highlight-show-all-button-label = すべて表示
+pdfjs-editor-highlight-show-all-button =
+    .title = 強調の表示を切り替えます

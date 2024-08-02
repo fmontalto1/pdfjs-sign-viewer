@@ -43,14 +43,14 @@ class BaseTreeViewer {
   }
 
   /**
-   * @private
+   * @protected
    */
   _dispatchEvent(count) {
     throw new Error("Not implemented: _dispatchEvent");
   }
 
   /**
-   * @private
+   * @protected
    */
   _bindLink(element, params) {
     throw new Error("Not implemented: _bindLink");
@@ -71,7 +71,9 @@ class BaseTreeViewer {
   /**
    * Prepend a button before a tree item which allows the user to collapse or
    * expand all tree items at that level; see `_toggleTreeItem`.
-   * @private
+   * @param {HTMLDivElement} div
+   * @param {boolean|object} [hidden]
+   * @protected
    */
   _addToggleButton(div, hidden = false) {
     const toggler = document.createElement("div");
@@ -161,6 +163,8 @@ class BaseTreeViewer {
     if (!treeItem) {
       return;
     }
+    // Pause translation when expanding the treeItem.
+    this._l10n.pause();
     // Ensure that the treeItem is *fully* expanded, such that it will first of
     // all be visible and secondly that scrolling it into view works correctly.
     let currentNode = treeItem.parentNode;
@@ -171,6 +175,8 @@ class BaseTreeViewer {
       }
       currentNode = currentNode.parentNode;
     }
+    this._l10n.resume();
+
     this._updateCurrentTreeItem(treeItem);
 
     this.container.scrollTo(

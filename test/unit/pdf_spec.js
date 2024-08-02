@@ -29,7 +29,6 @@ import {
   OPS,
   PasswordResponses,
   PermissionFlag,
-  PromiseCapability,
   shadow,
   UnexpectedResponseException,
   Util,
@@ -44,6 +43,7 @@ import {
 } from "../../src/display/api.js";
 import {
   DOMSVGFactory,
+  fetchData,
   getFilenameFromUrl,
   getPdfFilenameFromUrl,
   getXfaPageViewport,
@@ -55,14 +55,13 @@ import {
   RenderingCancelledException,
   setLayerDimensions,
 } from "../../src/display/display_utils.js";
-import {
-  renderTextLayer,
-  updateTextLayer,
-} from "../../src/display/text_layer.js";
 import { AnnotationEditorLayer } from "../../src/display/editor/annotation_editor_layer.js";
 import { AnnotationEditorUIManager } from "../../src/display/editor/tools.js";
 import { AnnotationLayer } from "../../src/display/annotation_layer.js";
+import { ColorPicker } from "../../src/display/editor/color_picker.js";
+import { DrawLayer } from "../../src/display/draw_layer.js";
 import { GlobalWorkerOptions } from "../../src/display/worker_options.js";
+import { TextLayer } from "../../src/display/text_layer.js";
 import { XfaLayer } from "../../src/display/xfa_layer.js";
 
 const expectedAPI = Object.freeze({
@@ -75,9 +74,12 @@ const expectedAPI = Object.freeze({
   AnnotationMode,
   build,
   CMapCompressionType,
+  ColorPicker,
   createValidAbsoluteUrl,
   DOMSVGFactory,
+  DrawLayer,
   FeatureTest,
+  fetchData,
   getDocument,
   getFilenameFromUrl,
   getPdfFilenameFromUrl,
@@ -97,13 +99,11 @@ const expectedAPI = Object.freeze({
   PDFWorker,
   PermissionFlag,
   PixelsPerInch,
-  PromiseCapability,
   RenderingCancelledException,
-  renderTextLayer,
   setLayerDimensions,
   shadow,
+  TextLayer,
   UnexpectedResponseException,
-  updateTextLayer,
   Util,
   VerbosityLevel,
   version,

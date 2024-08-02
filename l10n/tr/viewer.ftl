@@ -26,8 +26,8 @@ pdfjs-zoom-out-button =
     .title = Uzaklaştır
 pdfjs-zoom-out-button-label = Uzaklaştır
 pdfjs-zoom-in-button =
-    .title = Yaklaştır
-pdfjs-zoom-in-button-label = Yaklaştır
+    .title = Yakınlaştır
+pdfjs-zoom-in-button-label = Yakınlaştır
 pdfjs-zoom-select =
     .title = Yakınlaştırma
 pdfjs-presentation-mode-button =
@@ -51,12 +51,6 @@ pdfjs-download-button-label = İndir
 pdfjs-bookmark-button =
     .title = Geçerli sayfa (geçerli sayfanın adresini görüntüle)
 pdfjs-bookmark-button-label = Geçerli sayfa
-# Used in Firefox for Android.
-pdfjs-open-in-app-button =
-    .title = Uygulamada aç
-# Used in Firefox for Android.
-# Length of the translation matters since we are in a mobile context, with limited screen estate.
-pdfjs-open-in-app-button-label = Uygulamada aç
 
 ##  Secondary toolbar and context menu
 
@@ -85,10 +79,10 @@ pdfjs-scroll-page-button =
     .title = Sayfa kaydırmayı kullan
 pdfjs-scroll-page-button-label = Sayfa kaydırma
 pdfjs-scroll-vertical-button =
-    .title = Dikey kaydırma kullan
+    .title = Dikey kaydırmayı kullan
 pdfjs-scroll-vertical-button-label = Dikey kaydırma
 pdfjs-scroll-horizontal-button =
-    .title = Yatay kaydırma kullan
+    .title = Yatay kaydırmayı kullan
 pdfjs-scroll-horizontal-button-label = Yatay kaydırma
 pdfjs-scroll-wrapped-button =
     .title = Yan yana kaydırmayı kullan
@@ -122,7 +116,7 @@ pdfjs-document-properties-title = Başlık:
 pdfjs-document-properties-author = Yazar:
 pdfjs-document-properties-subject = Konu:
 pdfjs-document-properties-keywords = Anahtar kelimeler:
-pdfjs-document-properties-creation-date = Oluturma tarihi:
+pdfjs-document-properties-creation-date = Oluşturma tarihi:
 pdfjs-document-properties-modification-date = Değiştirme tarihi:
 # Variables:
 #   $date (Date) - the creation/modification date of the PDF file
@@ -226,6 +220,21 @@ pdfjs-find-match-diacritics-checkbox-label = Fonetik işaretleri bul
 pdfjs-find-entire-word-checkbox-label = Tam sözcükler
 pdfjs-find-reached-top = Belgenin başına ulaşıldı, sonundan devam edildi
 pdfjs-find-reached-bottom = Belgenin sonuna ulaşıldı, başından devam edildi
+# Variables:
+#   $current (Number) - the index of the currently active find result
+#   $total (Number) - the total number of matches in the document
+pdfjs-find-match-count =
+    { $total ->
+        [one] { $total } eşleşmeden { $current }. eşleşme
+       *[other] { $total } eşleşmeden { $current }. eşleşme
+    }
+# Variables:
+#   $limit (Number) - the maximum number of matches
+pdfjs-find-match-count-limit =
+    { $limit ->
+        [one] { $limit } eşleşmeden fazla
+       *[other] { $limit } eşleşmeden fazla
+    }
 pdfjs-find-not-found = Eşleşme bulunamadı
 
 ## Predefined zoom values
@@ -258,7 +267,7 @@ pdfjs-rendering-error = Sayfa yorumlanırken bir hata oluştu.
 # Variables:
 #   $date (Date) - the modification date of the annotation
 #   $time (Time) - the modification time of the annotation
-pdfjs-annotation-date-string = { $date }, { $time }
+pdfjs-annotation-date-string = { $date } { $time }
 # .alt: This is used as a tooltip.
 # Variables:
 #   $type (String) - an annotation type from a list defined in the PDF spec
@@ -286,6 +295,29 @@ pdfjs-editor-ink-button-label = Çiz
 pdfjs-editor-stamp-button =
     .title = Resim ekle veya düzenle
 pdfjs-editor-stamp-button-label = Resim ekle veya düzenle
+pdfjs-editor-highlight-button =
+    .title = Vurgula
+pdfjs-editor-highlight-button-label = Vurgula
+pdfjs-highlight-floating-button =
+    .title = Vurgula
+pdfjs-highlight-floating-button1 =
+    .title = Vurgula
+    .aria-label = Vurgula
+pdfjs-highlight-floating-button-label = Vurgula
+
+## Remove button for the various kind of editor.
+
+pdfjs-editor-remove-ink-button =
+    .title = Çizimi kaldır
+pdfjs-editor-remove-freetext-button =
+    .title = Metni kaldır
+pdfjs-editor-remove-stamp-button =
+    .title = Resmi kaldır
+pdfjs-editor-remove-highlight-button =
+    .title = Vurgulamayı kaldır
+
+##
+
 # Editor Parameters
 pdfjs-editor-free-text-color-input = Renk
 pdfjs-editor-free-text-size-input = Boyut
@@ -295,6 +327,10 @@ pdfjs-editor-ink-opacity-input = Saydamlık
 pdfjs-editor-stamp-add-image-button =
     .title = Resim ekle
 pdfjs-editor-stamp-add-image-button-label = Resim ekle
+# This refers to the thickness of the line used for free highlighting (not bound to text)
+pdfjs-editor-free-highlight-thickness-input = Kalınlık
+pdfjs-editor-free-highlight-thickness-title =
+    .title = Metin dışındaki öğeleri vurgularken kalınlığı değiştir
 pdfjs-free-text =
     .aria-label = Metin düzenleyicisi
 pdfjs-free-text-default-content = Yazmaya başlayın…
@@ -309,11 +345,11 @@ pdfjs-ink-canvas =
 pdfjs-editor-alt-text-button-label = Alternatif metin
 pdfjs-editor-alt-text-edit-button-label = Alternatif metni düzenle
 pdfjs-editor-alt-text-dialog-label = Bir seçenek seçin
-pdfjs-editor-alt-text-dialog-description = Alternatif metin, insanlar görseli göremediğinde veya görsel yüklenmediğinde işe yarar.
+pdfjs-editor-alt-text-dialog-description = Alternatif metin, insanlar resmi göremediğinde veya resim yüklenmediğinde işe yarar.
 pdfjs-editor-alt-text-add-description-label = Açıklama ekle
 pdfjs-editor-alt-text-add-description-description = Konuyu, ortamı veya eylemleri tanımlayan bir iki cümle yazmaya çalışın.
 pdfjs-editor-alt-text-mark-decorative-label = Dekoratif olarak işaretle
-pdfjs-editor-alt-text-mark-decorative-description = Kenarlıklar veya filigranlar gibi dekoratif görüntüler için kullanılır.
+pdfjs-editor-alt-text-mark-decorative-description = Kenarlıklar veya filigranlar gibi dekoratif resimler için kullanılır.
 pdfjs-editor-alt-text-cancel-button = Vazgeç
 pdfjs-editor-alt-text-save-button = Kaydet
 pdfjs-editor-alt-text-decorative-tooltip = Dekoratif olarak işaretlendi
@@ -332,3 +368,29 @@ pdfjs-editor-resizer-label-bottom-right = Sağ alt köşe — yeniden boyutland�
 pdfjs-editor-resizer-label-bottom-middle = Alt orta — yeniden boyutlandır
 pdfjs-editor-resizer-label-bottom-left = Sol alt köşe — yeniden boyutlandır
 pdfjs-editor-resizer-label-middle-left = Orta sol — yeniden boyutlandır
+
+## Color picker
+
+# This means "Color used to highlight text"
+pdfjs-editor-highlight-colorpicker-label = Vurgu rengi
+pdfjs-editor-colorpicker-button =
+    .title = Rengi değiştir
+pdfjs-editor-colorpicker-dropdown =
+    .aria-label = Renk seçenekleri
+pdfjs-editor-colorpicker-yellow =
+    .title = Sarı
+pdfjs-editor-colorpicker-green =
+    .title = Yeşil
+pdfjs-editor-colorpicker-blue =
+    .title = Mavi
+pdfjs-editor-colorpicker-pink =
+    .title = Pembe
+pdfjs-editor-colorpicker-red =
+    .title = Kırmızı
+
+## Show all highlights
+## This is a toggle button to show/hide all the highlights.
+
+pdfjs-editor-highlight-show-all-button-label = Tümünü göster
+pdfjs-editor-highlight-show-all-button =
+    .title = Tümünü göster

@@ -51,12 +51,6 @@ pdfjs-download-button-label = 下載
 pdfjs-bookmark-button =
     .title = 目前頁面（含目前檢視頁面的網址）
 pdfjs-bookmark-button-label = 目前頁面
-# Used in Firefox for Android.
-pdfjs-open-in-app-button =
-    .title = 在應用程式中開啟
-# Used in Firefox for Android.
-# Length of the translation matters since we are in a mobile context, with limited screen estate.
-pdfjs-open-in-app-button-label = 用程式開啟
 
 ##  Secondary toolbar and context menu
 
@@ -82,8 +76,8 @@ pdfjs-cursor-hand-tool-button =
     .title = 開啟頁面移動工具
 pdfjs-cursor-hand-tool-button-label = 頁面移動工具
 pdfjs-scroll-page-button =
-    .title = 使用頁面捲動功能
-pdfjs-scroll-page-button-label = 頁面捲動功能
+    .title = 使用單頁捲動版面
+pdfjs-scroll-page-button-label = 單頁捲動
 pdfjs-scroll-vertical-button =
     .title = 使用垂直捲動版面
 pdfjs-scroll-vertical-button-label = 垂直捲動
@@ -108,8 +102,8 @@ pdfjs-spread-even-button-label = 偶數跨頁
 pdfjs-document-properties-button =
     .title = 文件內容…
 pdfjs-document-properties-button-label = 文件內容…
-pdfjs-document-properties-file-name = 檔案名稱:
-pdfjs-document-properties-file-size = 檔案大小:
+pdfjs-document-properties-file-name = 檔案名稱：
+pdfjs-document-properties-file-size = 檔案大小：
 # Variables:
 #   $size_kb (Number) - the PDF file size in kilobytes
 #   $size_b (Number) - the PDF file size in bytes
@@ -118,21 +112,21 @@ pdfjs-document-properties-kb = { $size_kb } KB（{ $size_b } 位元組）
 #   $size_mb (Number) - the PDF file size in megabytes
 #   $size_b (Number) - the PDF file size in bytes
 pdfjs-document-properties-mb = { $size_mb } MB（{ $size_b } 位元組）
-pdfjs-document-properties-title = 標題:
-pdfjs-document-properties-author = 作者:
-pdfjs-document-properties-subject = 主旨:
-pdfjs-document-properties-keywords = 關鍵字:
-pdfjs-document-properties-creation-date = 建立日期:
-pdfjs-document-properties-modification-date = 修改日期:
+pdfjs-document-properties-title = 標題：
+pdfjs-document-properties-author = 作者：
+pdfjs-document-properties-subject = 主旨：
+pdfjs-document-properties-keywords = 關鍵字：
+pdfjs-document-properties-creation-date = 建立日期：
+pdfjs-document-properties-modification-date = 修改日期：
 # Variables:
 #   $date (Date) - the creation/modification date of the PDF file
 #   $time (Time) - the creation/modification time of the PDF file
 pdfjs-document-properties-date-string = { $date } { $time }
-pdfjs-document-properties-creator = 建立者:
-pdfjs-document-properties-producer = PDF 產生器:
-pdfjs-document-properties-version = PDF 版本:
-pdfjs-document-properties-page-count = 頁數:
-pdfjs-document-properties-page-size = 頁面大小:
+pdfjs-document-properties-creator = 建立者：
+pdfjs-document-properties-producer = PDF 產生器：
+pdfjs-document-properties-version = PDF 版本：
+pdfjs-document-properties-page-count = 頁數：
+pdfjs-document-properties-page-size = 頁面大小：
 pdfjs-document-properties-page-size-unit-inches = in
 pdfjs-document-properties-page-size-unit-millimeters = mm
 pdfjs-document-properties-page-size-orientation-portrait = 垂直
@@ -156,7 +150,7 @@ pdfjs-document-properties-page-size-dimension-name-string = { $width } × { $hei
 
 # The linearization status of the document; usually called "Fast Web View" in
 # English locales of Adobe software.
-pdfjs-document-properties-linearized = 快速 Web 檢視:
+pdfjs-document-properties-linearized = 快速 Web 檢視：
 pdfjs-document-properties-linearized-yes = 是
 pdfjs-document-properties-linearized-no = 否
 pdfjs-document-properties-close-button = 關閉
@@ -220,7 +214,7 @@ pdfjs-find-previous-button-label = 上一個
 pdfjs-find-next-button =
     .title = 尋找文字下次出現的位置
 pdfjs-find-next-button-label = 下一個
-pdfjs-find-highlight-checkbox = 全部強調標示
+pdfjs-find-highlight-checkbox = 強調全部
 pdfjs-find-match-case-checkbox-label = 區分大小寫
 pdfjs-find-match-diacritics-checkbox-label = 符合變音符號
 pdfjs-find-entire-word-checkbox-label = 符合整個字
@@ -293,6 +287,27 @@ pdfjs-editor-ink-button-label = 繪圖
 pdfjs-editor-stamp-button =
     .title = 新增或編輯圖片
 pdfjs-editor-stamp-button-label = 新增或編輯圖片
+pdfjs-editor-highlight-button =
+    .title = 強調
+pdfjs-editor-highlight-button-label = 強調
+pdfjs-highlight-floating-button1 =
+    .title = 強調
+    .aria-label = 強調
+pdfjs-highlight-floating-button-label = 強調
+
+## Remove button for the various kind of editor.
+
+pdfjs-editor-remove-ink-button =
+    .title = 移除繪圖
+pdfjs-editor-remove-freetext-button =
+    .title = 移除文字
+pdfjs-editor-remove-stamp-button =
+    .title = 移除圖片
+pdfjs-editor-remove-highlight-button =
+    .title = 移除強調範圍
+
+##
+
 # Editor Parameters
 pdfjs-editor-free-text-color-input = 色彩
 pdfjs-editor-free-text-size-input = 大小
@@ -302,9 +317,13 @@ pdfjs-editor-ink-opacity-input = 透​明度
 pdfjs-editor-stamp-add-image-button =
     .title = 新增圖片
 pdfjs-editor-stamp-add-image-button-label = 新增圖片
+# This refers to the thickness of the line used for free highlighting (not bound to text)
+pdfjs-editor-free-highlight-thickness-input = 線條粗細
+pdfjs-editor-free-highlight-thickness-title =
+    .title = 更改強調文字以外的項目時的線條粗細
 pdfjs-free-text =
     .aria-label = 文本編輯器
-pdfjs-free-text-default-content = 開始打字…
+pdfjs-free-text-default-content = 在此打字…
 pdfjs-ink =
     .aria-label = 圖形編輯器
 pdfjs-ink-canvas =
@@ -339,3 +358,29 @@ pdfjs-editor-resizer-label-bottom-right = 右下角 — 調整大小
 pdfjs-editor-resizer-label-bottom-middle = 底部中間 — 調整大小
 pdfjs-editor-resizer-label-bottom-left = 左下角 — 調整大小
 pdfjs-editor-resizer-label-middle-left = 中間左方 — 調整大小
+
+## Color picker
+
+# This means "Color used to highlight text"
+pdfjs-editor-highlight-colorpicker-label = 強調色彩
+pdfjs-editor-colorpicker-button =
+    .title = 更改色彩
+pdfjs-editor-colorpicker-dropdown =
+    .aria-label = 色彩選項
+pdfjs-editor-colorpicker-yellow =
+    .title = 黃色
+pdfjs-editor-colorpicker-green =
+    .title = 綠色
+pdfjs-editor-colorpicker-blue =
+    .title = 藍色
+pdfjs-editor-colorpicker-pink =
+    .title = 粉紅色
+pdfjs-editor-colorpicker-red =
+    .title = 紅色
+
+## Show all highlights
+## This is a toggle button to show/hide all the highlights.
+
+pdfjs-editor-highlight-show-all-button-label = 顯示全部
+pdfjs-editor-highlight-show-all-button =
+    .title = 顯示全部

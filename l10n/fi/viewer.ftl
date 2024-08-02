@@ -226,6 +226,21 @@ pdfjs-find-match-diacritics-checkbox-label = Erota tarkkeet
 pdfjs-find-entire-word-checkbox-label = Kokonaiset sanat
 pdfjs-find-reached-top = Päästiin dokumentin alkuun, jatketaan lopusta
 pdfjs-find-reached-bottom = Päästiin dokumentin loppuun, jatketaan alusta
+# Variables:
+#   $current (Number) - the index of the currently active find result
+#   $total (Number) - the total number of matches in the document
+pdfjs-find-match-count =
+    { $total ->
+        [one] { $current } / { $total } osuma
+       *[other] { $current } / { $total } osumaa
+    }
+# Variables:
+#   $limit (Number) - the maximum number of matches
+pdfjs-find-match-count-limit =
+    { $limit ->
+        [one] Yli { $limit } osuma
+       *[other] Yli { $limit } osumaa
+    }
 pdfjs-find-not-found = Hakusanaa ei löytynyt
 
 ## Predefined zoom values
@@ -286,6 +301,29 @@ pdfjs-editor-ink-button-label = Piirros
 pdfjs-editor-stamp-button =
     .title = Lisää tai muokkaa kuvia
 pdfjs-editor-stamp-button-label = Lisää tai muokkaa kuvia
+pdfjs-editor-highlight-button =
+    .title = Korostus
+pdfjs-editor-highlight-button-label = Korostus
+pdfjs-highlight-floating-button =
+    .title = Korostus
+pdfjs-highlight-floating-button1 =
+    .title = Korostus
+    .aria-label = Korostus
+pdfjs-highlight-floating-button-label = Korostus
+
+## Remove button for the various kind of editor.
+
+pdfjs-editor-remove-ink-button =
+    .title = Poista piirros
+pdfjs-editor-remove-freetext-button =
+    .title = Poista teksti
+pdfjs-editor-remove-stamp-button =
+    .title = Poista kuva
+pdfjs-editor-remove-highlight-button =
+    .title = Poista korostus
+
+##
+
 # Editor Parameters
 pdfjs-editor-free-text-color-input = Väri
 pdfjs-editor-free-text-size-input = Koko
@@ -295,6 +333,10 @@ pdfjs-editor-ink-opacity-input = Peittävyys
 pdfjs-editor-stamp-add-image-button =
     .title = Lisää kuva
 pdfjs-editor-stamp-add-image-button-label = Lisää kuva
+# This refers to the thickness of the line used for free highlighting (not bound to text)
+pdfjs-editor-free-highlight-thickness-input = Paksuus
+pdfjs-editor-free-highlight-thickness-title =
+    .title = Muuta paksuutta korostaessasi muita kohteita kuin tekstiä
 pdfjs-free-text =
     .aria-label = Tekstimuokkain
 pdfjs-free-text-default-content = Aloita kirjoittaminen…
@@ -324,3 +366,37 @@ pdfjs-editor-alt-text-textarea =
 ## Editor resizers
 ## This is used in an aria label to help to understand the role of the resizer.
 
+pdfjs-editor-resizer-label-top-left = Vasen yläkulma - muuta kokoa
+pdfjs-editor-resizer-label-top-middle = Ylhäällä keskellä - muuta kokoa
+pdfjs-editor-resizer-label-top-right = Oikea yläkulma - muuta kokoa
+pdfjs-editor-resizer-label-middle-right = Keskellä oikealla - muuta kokoa
+pdfjs-editor-resizer-label-bottom-right = Oikea alakulma - muuta kokoa
+pdfjs-editor-resizer-label-bottom-middle = Alhaalla keskellä - muuta kokoa
+pdfjs-editor-resizer-label-bottom-left = Vasen alakulma - muuta kokoa
+pdfjs-editor-resizer-label-middle-left = Keskellä vasemmalla - muuta kokoa
+
+## Color picker
+
+# This means "Color used to highlight text"
+pdfjs-editor-highlight-colorpicker-label = Korostusväri
+pdfjs-editor-colorpicker-button =
+    .title = Vaihda väri
+pdfjs-editor-colorpicker-dropdown =
+    .aria-label = Värivalinnat
+pdfjs-editor-colorpicker-yellow =
+    .title = Keltainen
+pdfjs-editor-colorpicker-green =
+    .title = Vihreä
+pdfjs-editor-colorpicker-blue =
+    .title = Sininen
+pdfjs-editor-colorpicker-pink =
+    .title = Pinkki
+pdfjs-editor-colorpicker-red =
+    .title = Punainen
+
+## Show all highlights
+## This is a toggle button to show/hide all the highlights.
+
+pdfjs-editor-highlight-show-all-button-label = Näytä kaikki
+pdfjs-editor-highlight-show-all-button =
+    .title = Näytä kaikki

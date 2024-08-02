@@ -14,18 +14,30 @@
  */
 
 import {
+  applyFunctionToEditor,
+  awaitPromise,
   closePages,
+  copy,
+  copyToClipboard,
   getEditorDimensions,
   getEditorSelector,
   getFirstSerialized,
+  getRect,
+  getSerialized,
   kbBigMoveDown,
   kbBigMoveRight,
-  kbPaste,
   kbSelectAll,
+  kbUndo,
   loadAndWait,
+  paste,
+  pasteFromClipboard,
+  scrollIntoView,
   serializeBitmapDimensions,
+  switchToEditor,
   waitForAnnotationEditorLayer,
+  waitForEntryInStorage,
   waitForSelectedEditor,
+  waitForSerialized,
   waitForStorageEntries,
 } from "./test_utils.mjs";
 import { fileURLToPath } from "url";
@@ -67,46 +79,14 @@ const copyImage = async (page, imagePath, number) => {
   const data = fs
     .readFileSync(path.join(__dirname, imagePath))
     .toString("base64");
-  await page.evaluate(async imageData => {
-    const resp = await fetch(`data:image/png;base64,${imageData}`);
-    const blob = await resp.blob();
 
-    await navigator.clipboard.write([
-      new ClipboardItem({
-        [blob.type]: blob,
-      }),
-    ]);
-  }, data);
-
-  let hasPasteEvent = false;
-  while (!hasPasteEvent) {
-    // We retry to paste if nothing has been pasted before 500ms.
-    const promise = Promise.race([
-      page.evaluate(
-        () =>
-          new Promise(resolve => {
-            document.addEventListener(
-              "paste",
-              e => resolve(e.clipboardData.items.length !== 0),
-              {
-                once: true,
-              }
-            );
-          })
-      ),
-      page.evaluate(
-        () =>
-          new Promise(resolve => {
-            setTimeout(() => resolve(false), 500);
-          })
-      ),
-    ]);
-    await kbPaste(page);
-    hasPasteEvent = await promise;
-  }
+  await copyToClipboard(page, { "image/png": `data:image/png;base64,${data}` });
+  await pasteFromClipboard(page);
 
   await waitForImage(page, getEditorSelector(number));
 };
+
+const switchToStamp = switchToEditor.bind(null, "Stamp");
 
 describe("Stamp Editor", () => {
   describe("Basic operations", () => {
@@ -128,7 +108,7 @@ describe("Stamp Editor", () => {
             return;
           }
 
-          await page.click("#editorStamp");
+          await switchToStamp(page);
           await page.click("#editorStampAddImage");
 
           const input = await page.$("#stampEditorFileInput");
@@ -205,7 +185,7 @@ describe("Stamp Editor", () => {
             return;
           }
 
-          await page.click("#editorStamp");
+          await switchToStamp(page);
           const names = ["bottomLeft", "bottomRight", "topRight", "topLeft"];
 
           for (let i = 0; i < 4; i++) {
@@ -227,11 +207,11 @@ describe("Stamp Editor", () => {
                 `${getEditorSelector(i)} .resizers.hidden`
               );
 
-              const promise = waitForAnnotationEditorLayer(page);
+              const handle = await waitForAnnotationEditorLayer(page);
               await page.evaluate(() => {
                 window.PDFViewerApplication.rotatePages(90);
               });
-              await promise;
+              await awaitPromise(handle);
 
               await page.focus(".stampEditor");
               await waitForSelectedEditor(page, getEditorSelector(i));
@@ -240,16 +220,14 @@ describe("Stamp Editor", () => {
                 `${getEditorSelector(i)} .resizers:not(.hidden)`
               );
 
-              const [name, cursor] = await page.evaluate(() => {
-                const { x, y } = document
-                  .querySelector(".stampEditor")
-                  .getBoundingClientRect();
-                const el = document.elementFromPoint(x, y);
+              const stampRect = await getRect(page, ".stampEditor");
+              const [name, cursor] = await page.evaluate(rect => {
+                const el = document.elementFromPoint(rect.x, rect.y);
                 const cornerName = Array.from(el.classList).find(
                   c => c !== "resizer"
                 );
                 return [cornerName, window.getComputedStyle(el).cursor];
-              });
+              }, stampRect);
 
               expect(name).withContext(`In ${browserName}`).toEqual(names[j]);
               expect(cursor)
@@ -257,11 +235,11 @@ describe("Stamp Editor", () => {
                 .toEqual("nwse-resize");
             }
 
-            const promise = waitForAnnotationEditorLayer(page);
+            const handle = await waitForAnnotationEditorLayer(page);
             await page.evaluate(() => {
               window.PDFViewerApplication.rotatePages(90);
             });
-            await promise;
+            await awaitPromise(handle);
           }
         })
       );
@@ -280,162 +258,159 @@ describe("Stamp Editor", () => {
     });
 
     it("must check that the alt-text flow is correctly implemented", async () => {
-      await Promise.all(
-        pages.map(async ([browserName, page]) => {
-          await page.click("#editorStamp");
+      // Run sequentially to avoid clipboard issues.
+      for (const [browserName, page] of pages) {
+        await switchToStamp(page);
 
-          await copyImage(page, "../images/firefox_logo.png", 0);
+        await copyImage(page, "../images/firefox_logo.png", 0);
 
-          // Wait for the alt-text button to be visible.
-          const buttonSelector = `${getEditorSelector(0)} button.altText`;
-          await page.waitForSelector(buttonSelector);
+        // Wait for the alt-text button to be visible.
+        const buttonSelector = `${getEditorSelector(0)} button.altText`;
+        await page.waitForSelector(buttonSelector);
 
-          // Click on the alt-text button.
-          await page.click(buttonSelector);
+        // Click on the alt-text button.
+        await page.click(buttonSelector);
 
-          // Check that the alt-text button has been hidden.
-          await page.waitForSelector(`${buttonSelector}[hidden]`);
+        // Wait for the alt-text dialog to be visible.
+        await page.waitForSelector("#altTextDialog", { visible: true });
 
-          // Wait for the alt-text dialog to be visible.
-          await page.waitForSelector("#altTextDialog", { visible: true });
+        // Click on the alt-text editor.
+        const textareaSelector = "#altTextDialog textarea";
+        await page.click(textareaSelector);
+        await page.type(textareaSelector, "Hello World");
 
-          // Click on the alt-text editor.
-          const textareaSelector = "#altTextDialog textarea";
-          await page.click(textareaSelector);
-          await page.type(textareaSelector, "Hello World");
+        // Click on save button.
+        const saveButtonSelector = "#altTextDialog #altTextSave";
+        await page.click(saveButtonSelector);
 
-          // Click on save button.
-          const saveButtonSelector = "#altTextDialog #altTextSave";
-          await page.click(saveButtonSelector);
+        // Check that the canvas has an aria-describedby attribute.
+        await page.waitForSelector(
+          `${getEditorSelector(0)} canvas[aria-describedby]`
+        );
 
-          // Check that the canvas has an aria-describedby attribute.
-          await page.waitForSelector(
-            `${getEditorSelector(0)} canvas[aria-describedby]`
-          );
+        // Wait for the alt-text button to have the correct icon.
+        await page.waitForSelector(`${buttonSelector}.done`);
 
-          // Wait for the alt-text button to have the correct icon.
-          await page.waitForSelector(`${buttonSelector}:not([hidden]).done`);
+        // Hover the button.
+        await page.hover(buttonSelector);
 
-          // Hover the button.
-          await page.hover(buttonSelector);
+        // Wait for the tooltip to be visible.
+        const tooltipSelector = `${buttonSelector} .tooltip`;
+        await page.waitForSelector(tooltipSelector, { visible: true });
 
-          // Wait for the tooltip to be visible.
-          const tooltipSelector = `${buttonSelector} .tooltip`;
-          await page.waitForSelector(tooltipSelector, { visible: true });
+        let tooltipText = await page.evaluate(
+          sel => document.querySelector(`${sel}`).innerText,
+          tooltipSelector
+        );
+        expect(tooltipText).toEqual("Hello World");
 
-          let tooltipText = await page.evaluate(
-            sel => document.querySelector(`${sel}`).innerText,
-            tooltipSelector
-          );
-          expect(tooltipText).toEqual("Hello World");
+        // Now we change the alt-text and check that the tooltip is updated.
+        await page.click(buttonSelector);
+        await page.waitForSelector("#altTextDialog", { visible: true });
+        await page.evaluate(sel => {
+          document.querySelector(`${sel}`).value = "";
+        }, textareaSelector);
+        await page.click(textareaSelector);
+        await page.type(textareaSelector, "Dlrow Olleh");
+        await page.click(saveButtonSelector);
+        await page.waitForSelector(`${buttonSelector}.done`);
+        await page.hover(buttonSelector);
+        await page.waitForSelector(tooltipSelector, { visible: true });
+        tooltipText = await page.evaluate(
+          sel => document.querySelector(`${sel}`).innerText,
+          tooltipSelector
+        );
+        expect(tooltipText).toEqual("Dlrow Olleh");
 
-          // Now we change the alt-text and check that the tooltip is updated.
-          await page.click(buttonSelector);
-          await page.waitForSelector("#altTextDialog", { visible: true });
-          await page.evaluate(sel => {
-            document.querySelector(`${sel}`).value = "";
-          }, textareaSelector);
-          await page.click(textareaSelector);
-          await page.type(textareaSelector, "Dlrow Olleh");
-          await page.click(saveButtonSelector);
-          await page.waitForSelector(`${buttonSelector}.done`);
-          await page.hover(buttonSelector);
-          await page.waitForSelector(tooltipSelector, { visible: true });
-          tooltipText = await page.evaluate(
-            sel => document.querySelector(`${sel}`).innerText,
-            tooltipSelector
-          );
-          expect(tooltipText).toEqual("Dlrow Olleh");
+        // Now we just check that cancel didn't change anything.
+        await page.click(buttonSelector);
+        await page.waitForSelector("#altTextDialog", { visible: true });
+        await page.evaluate(sel => {
+          document.querySelector(`${sel}`).value = "";
+        }, textareaSelector);
+        await page.click(textareaSelector);
+        await page.type(textareaSelector, "Hello PDF.js");
+        const cancelButtonSelector = "#altTextDialog #altTextCancel";
+        await page.click(cancelButtonSelector);
+        await page.waitForSelector(`${buttonSelector}.done`);
+        await page.hover(buttonSelector);
+        await page.waitForSelector(tooltipSelector, { visible: true });
+        tooltipText = await page.evaluate(
+          sel => document.querySelector(`${sel}`).innerText,
+          tooltipSelector
+        );
+        // The tooltip should still be "Dlrow Olleh".
+        expect(tooltipText).toEqual("Dlrow Olleh");
 
-          // Now we just check that cancel didn't change anything.
-          await page.click(buttonSelector);
-          await page.waitForSelector("#altTextDialog", { visible: true });
-          await page.evaluate(sel => {
-            document.querySelector(`${sel}`).value = "";
-          }, textareaSelector);
-          await page.click(textareaSelector);
-          await page.type(textareaSelector, "Hello PDF.js");
-          const cancelButtonSelector = "#altTextDialog #altTextCancel";
-          await page.click(cancelButtonSelector);
-          await page.waitForSelector(`${buttonSelector}.done`);
-          await page.hover(buttonSelector);
-          await page.waitForSelector(tooltipSelector, { visible: true });
-          tooltipText = await page.evaluate(
-            sel => document.querySelector(`${sel}`).innerText,
-            tooltipSelector
-          );
-          // The tooltip should still be "Dlrow Olleh".
-          expect(tooltipText).toEqual("Dlrow Olleh");
+        // Now we switch to decorative.
+        await page.click(buttonSelector);
+        await page.waitForSelector("#altTextDialog", { visible: true });
+        const decorativeSelector = "#altTextDialog #decorativeButton";
+        await page.click(decorativeSelector);
+        await page.click(saveButtonSelector);
+        await page.waitForSelector(`${buttonSelector}.done`);
+        await page.hover(buttonSelector);
+        await page.waitForSelector(tooltipSelector, { visible: true });
+        tooltipText = await page.evaluate(
+          sel => document.querySelector(`${sel}`).innerText,
+          tooltipSelector
+        );
+        expect(tooltipText).toEqual("Marked as decorative");
 
-          // Now we switch to decorative.
-          await page.click(buttonSelector);
-          await page.waitForSelector("#altTextDialog", { visible: true });
-          const decorativeSelector = "#altTextDialog #decorativeButton";
-          await page.click(decorativeSelector);
-          await page.click(saveButtonSelector);
-          await page.waitForSelector(`${buttonSelector}.done`);
-          await page.hover(buttonSelector);
-          await page.waitForSelector(tooltipSelector, { visible: true });
-          tooltipText = await page.evaluate(
-            sel => document.querySelector(`${sel}`).innerText,
-            tooltipSelector
-          );
-          expect(tooltipText).toEqual("Marked as decorative");
+        // Now we switch back to non-decorative.
+        await page.click(buttonSelector);
+        await page.waitForSelector("#altTextDialog", { visible: true });
+        const descriptionSelector = "#altTextDialog #descriptionButton";
+        await page.click(descriptionSelector);
+        await page.click(saveButtonSelector);
+        await page.waitForSelector(`${buttonSelector}.done`);
+        await page.hover(buttonSelector);
+        await page.waitForSelector(tooltipSelector, { visible: true });
+        tooltipText = await page.evaluate(
+          sel => document.querySelector(`${sel}`).innerText,
+          tooltipSelector
+        );
+        expect(tooltipText).toEqual("Dlrow Olleh");
 
-          // Now we switch back to non-decorative.
-          await page.click(buttonSelector);
-          await page.waitForSelector("#altTextDialog", { visible: true });
-          const descriptionSelector = "#altTextDialog #descriptionButton";
-          await page.click(descriptionSelector);
-          await page.click(saveButtonSelector);
-          await page.waitForSelector(`${buttonSelector}.done`);
-          await page.hover(buttonSelector);
-          await page.waitForSelector(tooltipSelector, { visible: true });
-          tooltipText = await page.evaluate(
-            sel => document.querySelector(`${sel}`).innerText,
-            tooltipSelector
-          );
-          expect(tooltipText).toEqual("Dlrow Olleh");
+        // Now we remove the alt-text and check that the tooltip is removed.
+        await page.click(buttonSelector);
+        await page.waitForSelector("#altTextDialog", { visible: true });
+        await page.evaluate(sel => {
+          document.querySelector(`${sel}`).value = "";
+        }, textareaSelector);
+        await page.click(saveButtonSelector);
+        await page.waitForSelector(`${buttonSelector}:not(.done)`);
+        await page.hover(buttonSelector);
+        await page.evaluate(
+          sel => document.querySelector(sel) === null,
+          tooltipSelector
+        );
 
-          // Now we remove the alt-text and check that the tooltip is removed.
-          await page.click(buttonSelector);
-          await page.waitForSelector("#altTextDialog", { visible: true });
-          await page.evaluate(sel => {
-            document.querySelector(`${sel}`).value = "";
-          }, textareaSelector);
-          await page.click(saveButtonSelector);
-          await page.waitForSelector(`${buttonSelector}:not(.done)`);
-          await page.hover(buttonSelector);
-          await page.evaluate(
-            sel => document.querySelector(sel) === null,
-            tooltipSelector
-          );
-
-          // We check that the alt-text button works correctly with the
-          // keyboard.
-          await page.evaluate(sel => {
-            document.getElementById("viewerContainer").focus();
-            return new Promise(resolve => {
+        // We check that the alt-text button works correctly with the
+        // keyboard.
+        const handle = await page.evaluateHandle(sel => {
+          document.getElementById("viewerContainer").focus();
+          return [
+            new Promise(resolve => {
               setTimeout(() => {
                 const el = document.querySelector(sel);
                 el.addEventListener("focus", resolve, { once: true });
                 el.focus({ focusVisible: true });
               }, 0);
-            });
-          }, buttonSelector);
-          await (browserName === "chrome"
-            ? page.waitForSelector(`${buttonSelector}:focus`)
-            : page.waitForSelector(`${buttonSelector}:focus-visible`));
-          await page.keyboard.press("Enter");
-          await page.waitForSelector(`${buttonSelector}[hidden]`);
-          await page.waitForSelector("#altTextDialog", { visible: true });
-          await page.keyboard.press("Escape");
-          await page.waitForSelector(`${buttonSelector}:not([hidden])`);
-          await (browserName === "chrome"
-            ? page.waitForSelector(`${buttonSelector}:focus`)
-            : page.waitForSelector(`${buttonSelector}:focus-visible`));
-        })
-      );
+            }),
+          ];
+        }, buttonSelector);
+        await awaitPromise(handle);
+        await (browserName === "chrome"
+          ? page.waitForSelector(`${buttonSelector}:focus`)
+          : page.waitForSelector(`${buttonSelector}:focus-visible`));
+        await page.keyboard.press("Enter");
+        await page.waitForSelector("#altTextDialog", { visible: true });
+        await page.keyboard.press("Escape");
+        await (browserName === "chrome"
+          ? page.waitForSelector(`${buttonSelector}:focus`)
+          : page.waitForSelector(`${buttonSelector}:focus-visible`));
+      }
     });
   });
 
@@ -451,125 +426,413 @@ describe("Stamp Editor", () => {
     });
 
     it("must check that the dimensions change", async () => {
-      await Promise.all(
-        pages.map(async ([browserName, page]) => {
-          await page.click("#editorStamp");
+      // Run sequentially to avoid clipboard issues.
+      for (const [browserName, page] of pages) {
+        await switchToStamp(page);
 
-          await copyImage(page, "../images/firefox_logo.png", 0);
+        await copyImage(page, "../images/firefox_logo.png", 0);
 
-          const editorSelector = getEditorSelector(0);
+        const editorSelector = getEditorSelector(0);
 
-          await page.click(editorSelector);
-          await waitForSelectedEditor(page, editorSelector);
+        await page.click(editorSelector);
+        await waitForSelectedEditor(page, editorSelector);
 
-          await page.waitForSelector(
-            `${editorSelector} .resizer.topLeft[tabindex="-1"]`
+        await page.waitForSelector(
+          `${editorSelector} .resizer.topLeft[tabindex="-1"]`
+        );
+
+        const getDims = async () => {
+          const [blX, blY, trX, trY] = await getFirstSerialized(
+            page,
+            x => x.rect
           );
+          return [trX - blX, trY - blY];
+        };
 
-          const getDims = async () => {
-            const [blX, blY, trX, trY] = await getFirstSerialized(
-              page,
-              x => x.rect
-            );
-            return [trX - blX, trY - blY];
-          };
+        const [width, height] = await getDims();
 
-          const [width, height] = await getDims();
+        // Press Enter to enter in resize-with-keyboard mode.
+        await page.keyboard.press("Enter");
 
-          // Press Enter to enter in resize-with-keyboard mode.
-          await page.keyboard.press("Enter");
+        // The resizer must become keyboard focusable.
+        await page.waitForSelector(
+          `${editorSelector} .resizer.topLeft[tabindex="0"]`
+        );
 
-          // The resizer must become keyboard focusable.
-          await page.waitForSelector(
-            `${editorSelector} .resizer.topLeft[tabindex="0"]`
-          );
+        let prevWidth = width;
+        let prevHeight = height;
 
-          let prevWidth = width;
-          let prevHeight = height;
-
-          const waitForDimsChange = async (w, h) => {
-            await page.waitForFunction(
-              (prevW, prevH) => {
-                const [x1, y1, x2, y2] =
-                  window.PDFViewerApplication.pdfDocument.annotationStorage.serializable.map
-                    .values()
-                    .next().value.rect;
-                const newWidth = x2 - x1;
-                const newHeight = y2 - y1;
-                return newWidth !== prevW || newHeight !== prevH;
-              },
-              {},
-              w,
-              h
-            );
-          };
-
-          for (let i = 0; i < 40; i++) {
-            await page.keyboard.press("ArrowLeft");
-            await waitForDimsChange(prevWidth, prevHeight);
-            [prevWidth, prevHeight] = await getDims();
-          }
-
-          let [newWidth, newHeight] = await getDims();
-          expect(newWidth > width + 30)
-            .withContext(`In ${browserName}`)
-            .toEqual(true);
-          expect(newHeight > height + 30)
-            .withContext(`In ${browserName}`)
-            .toEqual(true);
-
-          for (let i = 0; i < 4; i++) {
-            await kbBigMoveRight(page);
-            await waitForDimsChange(prevWidth, prevHeight);
-            [prevWidth, prevHeight] = await getDims();
-          }
-
-          [newWidth, newHeight] = await getDims();
-          expect(Math.abs(newWidth - width) < 2)
-            .withContext(`In ${browserName}`)
-            .toEqual(true);
-          expect(Math.abs(newHeight - height) < 2)
-            .withContext(`In ${browserName}`)
-            .toEqual(true);
-
-          // Move the focus to the next resizer.
-          await page.keyboard.press("Tab");
+        const waitForDimsChange = async (w, h) => {
           await page.waitForFunction(
-            () => !!document.activeElement?.classList.contains("topMiddle")
+            (prevW, prevH) => {
+              const [x1, y1, x2, y2] =
+                window.PDFViewerApplication.pdfDocument.annotationStorage.serializable.map
+                  .values()
+                  .next().value.rect;
+              const newWidth = x2 - x1;
+              const newHeight = y2 - y1;
+              return newWidth !== prevW || newHeight !== prevH;
+            },
+            {},
+            w,
+            h
           );
+        };
 
-          for (let i = 0; i < 40; i++) {
-            await page.keyboard.press("ArrowUp");
-            await waitForDimsChange(prevWidth, prevHeight);
-            [prevWidth, prevHeight] = await getDims();
-          }
+        for (let i = 0; i < 40; i++) {
+          await page.keyboard.press("ArrowLeft");
+          await waitForDimsChange(prevWidth, prevHeight);
+          [prevWidth, prevHeight] = await getDims();
+        }
 
-          [, newHeight] = await getDims();
-          expect(newHeight > height + 50)
-            .withContext(`In ${browserName}`)
-            .toEqual(true);
+        let [newWidth, newHeight] = await getDims();
+        expect(newWidth > width + 30)
+          .withContext(`In ${browserName}`)
+          .toEqual(true);
+        expect(newHeight > height + 30)
+          .withContext(`In ${browserName}`)
+          .toEqual(true);
 
-          for (let i = 0; i < 4; i++) {
-            await kbBigMoveDown(page);
-            await waitForDimsChange(prevWidth, prevHeight);
-            [prevWidth, prevHeight] = await getDims();
-          }
+        for (let i = 0; i < 4; i++) {
+          await kbBigMoveRight(page);
+          await waitForDimsChange(prevWidth, prevHeight);
+          [prevWidth, prevHeight] = await getDims();
+        }
 
-          [, newHeight] = await getDims();
-          expect(Math.abs(newHeight - height) < 2)
-            .withContext(`In ${browserName}`)
-            .toEqual(true);
+        [newWidth, newHeight] = await getDims();
+        expect(Math.abs(newWidth - width) < 2)
+          .withContext(`In ${browserName}`)
+          .toEqual(true);
+        expect(Math.abs(newHeight - height) < 2)
+          .withContext(`In ${browserName}`)
+          .toEqual(true);
 
-          // Escape should remove the focus from the resizer.
-          await page.keyboard.press("Escape");
-          await page.waitForSelector(
-            `${editorSelector} .resizer.topLeft[tabindex="-1"]`
-          );
-          await page.waitForFunction(
-            () => !document.activeElement?.classList.contains("resizer")
-          );
-        })
+        // Move the focus to the next resizer.
+        await page.keyboard.press("Tab");
+        await page.waitForFunction(
+          () => !!document.activeElement?.classList.contains("topMiddle")
+        );
+
+        for (let i = 0; i < 40; i++) {
+          await page.keyboard.press("ArrowUp");
+          await waitForDimsChange(prevWidth, prevHeight);
+          [prevWidth, prevHeight] = await getDims();
+        }
+
+        [, newHeight] = await getDims();
+        expect(newHeight > height + 50)
+          .withContext(`In ${browserName}`)
+          .toEqual(true);
+
+        for (let i = 0; i < 4; i++) {
+          await kbBigMoveDown(page);
+          await waitForDimsChange(prevWidth, prevHeight);
+          [prevWidth, prevHeight] = await getDims();
+        }
+
+        [, newHeight] = await getDims();
+        expect(Math.abs(newHeight - height) < 2)
+          .withContext(`In ${browserName}`)
+          .toEqual(true);
+
+        // Escape should remove the focus from the resizer.
+        await page.keyboard.press("Escape");
+        await page.waitForSelector(
+          `${editorSelector} .resizer.topLeft[tabindex="-1"]`
+        );
+        await page.waitForFunction(
+          () => !document.activeElement?.classList.contains("resizer")
+        );
+      }
+    });
+  });
+
+  describe("Copy/paste from a tab to an other", () => {
+    let pages1, pages2;
+
+    beforeAll(async () => {
+      pages1 = await loadAndWait("empty.pdf", ".annotationEditorLayer");
+      pages2 = await loadAndWait("empty.pdf", ".annotationEditorLayer");
+    });
+
+    afterAll(async () => {
+      await closePages(pages1);
+      await closePages(pages2);
+    });
+
+    it("must check that the alt-text button is here when pasting in the second tab", async () => {
+      for (let i = 0; i < pages1.length; i++) {
+        const [, page1] = pages1[i];
+        await page1.bringToFront();
+        await switchToStamp(page1);
+
+        await copyImage(page1, "../images/firefox_logo.png", 0);
+        await copy(page1);
+
+        const [, page2] = pages2[i];
+        await page2.bringToFront();
+        await switchToStamp(page2);
+
+        await paste(page2);
+
+        await waitForImage(page2, getEditorSelector(0));
+      }
+    });
+  });
+
+  describe("Undo a stamp", () => {
+    let pages;
+
+    beforeAll(async () => {
+      pages = await loadAndWait("tracemonkey.pdf", ".annotationEditorLayer");
+    });
+
+    afterAll(async () => {
+      await closePages(pages);
+    });
+
+    it("must check that a stamp can be undone", async () => {
+      // Run sequentially to avoid clipboard issues.
+      for (const [, page] of pages) {
+        await switchToStamp(page);
+        const selector = getEditorSelector(0);
+
+        await copyImage(page, "../images/firefox_logo.png", 0);
+        await page.waitForSelector(selector);
+        await waitForSerialized(page, 1);
+
+        await page.waitForSelector(`${selector} button.delete`);
+        await page.click(`${selector} button.delete`);
+        await waitForSerialized(page, 0);
+
+        await kbUndo(page);
+        await waitForSerialized(page, 1);
+        await page.waitForSelector(`${selector} canvas`);
+      }
+    });
+  });
+
+  describe("Delete a stamp and undo it on another page", () => {
+    let pages;
+
+    beforeAll(async () => {
+      pages = await loadAndWait("tracemonkey.pdf", ".annotationEditorLayer");
+    });
+
+    afterAll(async () => {
+      await closePages(pages);
+    });
+
+    it("must check that a stamp can be undone", async () => {
+      // Run sequentially to avoid clipboard issues.
+      for (const [, page] of pages) {
+        await switchToStamp(page);
+        const selector = getEditorSelector(0);
+
+        await copyImage(page, "../images/firefox_logo.png", 0);
+        await page.waitForSelector(selector);
+        await waitForSerialized(page, 1);
+
+        await page.waitForSelector(`${selector} button.delete`);
+        await page.click(`${selector} button.delete`);
+        await waitForSerialized(page, 0);
+
+        const twoToFourteen = Array.from(new Array(13).keys(), n => n + 2);
+        for (const pageNumber of twoToFourteen) {
+          const pageSelector = `.page[data-page-number = "${pageNumber}"]`;
+          await scrollIntoView(page, pageSelector);
+        }
+
+        await kbUndo(page);
+        await waitForSerialized(page, 1);
+
+        const thirteenToOne = Array.from(new Array(13).keys(), n => 13 - n);
+        for (const pageNumber of thirteenToOne) {
+          const pageSelector = `.page[data-page-number = "${pageNumber}"]`;
+          await scrollIntoView(page, pageSelector);
+        }
+
+        await page.waitForSelector(`${selector} canvas`);
+      }
+    });
+  });
+
+  describe("Delete a stamp, scroll and undo it", () => {
+    let pages;
+
+    beforeAll(async () => {
+      pages = await loadAndWait("tracemonkey.pdf", ".annotationEditorLayer");
+    });
+
+    afterAll(async () => {
+      await closePages(pages);
+    });
+
+    it("must check that a stamp can be undone", async () => {
+      // Run sequentially to avoid clipboard issues.
+      for (const [, page] of pages) {
+        await switchToStamp(page);
+        const selector = getEditorSelector(0);
+
+        await copyImage(page, "../images/firefox_logo.png", 0);
+        await page.waitForSelector(selector);
+        await waitForSerialized(page, 1);
+
+        await page.waitForSelector(`${selector} button.delete`);
+        await page.click(`${selector} button.delete`);
+        await waitForSerialized(page, 0);
+
+        const twoToOne = Array.from(new Array(13).keys(), n => n + 2).concat(
+          Array.from(new Array(13).keys(), n => 13 - n)
+        );
+        for (const pageNumber of twoToOne) {
+          const pageSelector = `.page[data-page-number = "${pageNumber}"]`;
+          await scrollIntoView(page, pageSelector);
+        }
+
+        await kbUndo(page);
+        await waitForSerialized(page, 1);
+        await page.waitForSelector(`${selector} canvas`);
+      }
+    });
+  });
+
+  describe("Resize a stamp", () => {
+    let pages;
+
+    beforeAll(async () => {
+      pages = await loadAndWait("empty.pdf", ".annotationEditorLayer");
+    });
+
+    afterAll(async () => {
+      await closePages(pages);
+    });
+
+    it("must check that a resized stamp has its canvas at the right position", async () => {
+      // Run sequentially to avoid clipboard issues.
+      for (const [, page] of pages) {
+        await switchToStamp(page);
+
+        await copyImage(page, "../images/firefox_logo.png", 0);
+        await page.waitForSelector(getEditorSelector(0));
+        await waitForSerialized(page, 1);
+
+        const serializedRect = await getFirstSerialized(page, x => x.rect);
+        const rect = await getRect(page, ".resizer.bottomRight");
+        const centerX = rect.x + rect.width / 2;
+        const centerY = rect.y + rect.height / 2;
+
+        await page.mouse.move(centerX, centerY);
+        await page.mouse.down();
+        await page.mouse.move(centerX - 500, centerY - 500);
+        await page.mouse.up();
+
+        await waitForEntryInStorage(
+          page,
+          "rect",
+          serializedRect,
+          (x, y) => x !== y
+        );
+
+        const canvasRect = await getRect(
+          page,
+          `${getEditorSelector(0)} canvas`
+        );
+        const stampRect = await getRect(page, getEditorSelector(0));
+
+        expect(
+          ["x", "y", "width", "height"].every(
+            key => Math.abs(canvasRect[key] - stampRect[key]) <= 10
+          )
+        ).toBeTrue();
+      }
+    });
+  });
+
+  describe("Add a stamp in odd spread mode", () => {
+    let pages;
+
+    beforeAll(async () => {
+      pages = await loadAndWait(
+        "empty.pdf",
+        ".annotationEditorLayer",
+        null,
+        null,
+        {
+          spreadModeOnLoad: 1,
+        }
       );
+    });
+
+    afterAll(async () => {
+      await closePages(pages);
+    });
+
+    it("must check that the stamp has its canvas at the right position", async () => {
+      // Run sequentially to avoid clipboard issues.
+      for (const [, page] of pages) {
+        await switchToStamp(page);
+
+        await copyImage(page, "../images/firefox_logo.png", 0);
+        await page.waitForSelector(getEditorSelector(0));
+        await waitForSerialized(page, 1);
+
+        const canvasRect = await getRect(
+          page,
+          `${getEditorSelector(0)} canvas`
+        );
+        const stampRect = await getRect(page, getEditorSelector(0));
+
+        expect(
+          ["x", "y", "width", "height"].every(
+            key => Math.abs(canvasRect[key] - stampRect[key]) <= 10
+          )
+        ).toBeTrue();
+      }
+    });
+  });
+
+  describe("Copy and paste a stamp with an alt text", () => {
+    let pages;
+
+    beforeAll(async () => {
+      pages = await loadAndWait("empty.pdf", ".annotationEditorLayer");
+    });
+
+    afterAll(async () => {
+      await closePages(pages);
+    });
+
+    it("must check that the pasted image has an alt text", async () => {
+      // Run sequentially to avoid clipboard issues.
+      for (const [browserName, page] of pages) {
+        await switchToStamp(page);
+
+        await copyImage(page, "../images/firefox_logo.png", 0);
+        await page.waitForSelector(getEditorSelector(0));
+        await waitForSerialized(page, 1);
+        await applyFunctionToEditor(page, "pdfjs_internal_editor_0", editor => {
+          editor.altTextData = {
+            altText: "Hello World",
+            decorative: false,
+          };
+        });
+        await page.waitForSelector(`${getEditorSelector(0)} .altText.done`);
+
+        await copy(page);
+        await paste(page);
+        await page.waitForSelector(`${getEditorSelector(1)} .altText.done`);
+        await waitForSerialized(page, 2);
+
+        const serialized = await getSerialized(
+          page,
+          x => x.accessibilityData?.alt
+        );
+
+        expect(serialized)
+          .withContext(`In ${browserName}`)
+          .toEqual(["Hello World", "Hello World"]);
+      }
     });
   });
 });

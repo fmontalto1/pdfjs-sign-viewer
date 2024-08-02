@@ -370,6 +370,8 @@ class ColorSpace {
         case "RGB":
         case "DeviceRGB":
           return this.singletons.rgb;
+        case "DeviceRGBA":
+          return this.singletons.rgba;
         case "CMYK":
         case "DeviceCMYK":
           return this.singletons.cmyk;
@@ -394,7 +396,9 @@ class ColorSpace {
               }
             }
           }
-          throw new FormatError(`Unrecognized ColorSpace: ${cs.name}`);
+          // Fallback to the default gray color space.
+          warn(`Unrecognized ColorSpace: ${cs.name}`);
+          return this.singletons.gray;
       }
     }
     if (Array.isArray(cs)) {
@@ -472,10 +476,14 @@ class ColorSpace {
           const range = params.getArray("Range");
           return new LabCS(whitePoint, blackPoint, range);
         default:
-          throw new FormatError(`Unimplemented ColorSpace object: ${mode}`);
+          // Fallback to the default gray color space.
+          warn(`Unimplemented ColorSpace object: ${mode}`);
+          return this.singletons.gray;
       }
     }
-    throw new FormatError(`Unrecognized ColorSpace object: ${cs}`);
+    // Fallback to the default gray color space.
+    warn(`Unrecognized ColorSpace object: ${cs}`);
+    return this.singletons.gray;
   }
 
   /**
@@ -510,6 +518,9 @@ class ColorSpace {
       },
       get rgb() {
         return shadow(this, "rgb", new DeviceRgbCS());
+      },
+      get rgba() {
+        return shadow(this, "rgba", new DeviceRgbaCS());
       },
       get cmyk() {
         return shadow(this, "cmyk", new DeviceCmykCS());
@@ -771,6 +782,23 @@ class DeviceRgbCS extends ColorSpace {
 
   getOutputLength(inputLength, alpha01) {
     return ((inputLength * (3 + alpha01)) / 3) | 0;
+  }
+
+  isPassthrough(bits) {
+    return bits === 8;
+  }
+}
+
+/**
+ * The default color is `new Float32Array([0, 0, 0, 1])`.
+ */
+class DeviceRgbaCS extends ColorSpace {
+  constructor() {
+    super("DeviceRGBA", 4);
+  }
+
+  getOutputLength(inputLength, _alpha01) {
+    return inputLength * 4;
   }
 
   isPassthrough(bits) {

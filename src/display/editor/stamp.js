@@ -55,8 +55,8 @@ class StampEditor extends AnnotationEditor {
   }
 
   /** @inheritdoc */
-  static initialize(l10n) {
-    AnnotationEditor.initialize(l10n);
+  static initialize(l10n, uiManager) {
+    AnnotationEditor.initialize(l10n, uiManager);
   }
 
   static get supportedTypes() {
@@ -96,6 +96,14 @@ class StampEditor extends AnnotationEditor {
     });
   }
 
+  /** @inheritdoc */
+  altTextFinish() {
+    if (this._uiManager.useNewAltTextFlow) {
+      this.div.hidden = false;
+    }
+    super.altTextFinish();
+  }
+
   #getBitmapFetched(data, fromId = false) {
     if (!data) {
       this.remove();
@@ -115,7 +123,17 @@ class StampEditor extends AnnotationEditor {
   #getBitmapDone() {
     this.#bitmapPromise = null;
     this._uiManager.enableWaiting(false);
-    if (this.#canvas) {
+    if (!this.#canvas) {
+      return;
+    }
+    if (
+      this._uiManager.useNewAltTextWhenAddingImage &&
+      this._uiManager.useNewAltTextFlow &&
+      this.#bitmap
+    ) {
+      this._editToolbar.hide();
+      this._uiManager.editAltText(this, /* firstTime = */ true);
+    } else {
       this.div.focus();
     }
   }
@@ -160,26 +178,35 @@ class StampEditor extends AnnotationEditor {
     }
     input.type = "file";
     input.accept = StampEditor.supportedTypesStr;
+    const signal = this._uiManager._signal;
     this.#bitmapPromise = new Promise(resolve => {
-      input.addEventListener("change", async () => {
-        if (!input.files || input.files.length === 0) {
+      input.addEventListener(
+        "change",
+        async () => {
+          if (!input.files || input.files.length === 0) {
+            this.remove();
+          } else {
+            this._uiManager.enableWaiting(true);
+            const data = await this._uiManager.imageManager.getFromFile(
+              input.files[0]
+            );
+            this.#getBitmapFetched(data);
+          }
+          if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("TESTING")) {
+            input.remove();
+          }
+          resolve();
+        },
+        { signal }
+      );
+      input.addEventListener(
+        "cancel",
+        () => {
           this.remove();
-        } else {
-          this._uiManager.enableWaiting(true);
-          const data = await this._uiManager.imageManager.getFromFile(
-            input.files[0]
-          );
-          this.#getBitmapFetched(data);
-        }
-        if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("TESTING")) {
-          input.remove();
-        }
-        resolve();
-      });
-      input.addEventListener("cancel", () => {
-        this.remove();
-        resolve();
-      });
+          resolve();
+        },
+        { signal }
+      );
     }).finally(() => this.#getBitmapDone());
     if (typeof PDFJSDev === "undefined" || !PDFJSDev.test("TESTING")) {
       input.click();
@@ -218,7 +245,7 @@ class StampEditor extends AnnotationEditor {
       return;
     }
 
-    if (this.#bitmapId) {
+    if (this.#bitmapId && this.#canvas === null) {
       this.#getBitmap();
     }
 
@@ -241,7 +268,8 @@ class StampEditor extends AnnotationEditor {
       this.#bitmapPromise ||
       this.#bitmap ||
       this.#bitmapUrl ||
-      this.#bitmapFile
+      this.#bitmapFile ||
+      this.#bitmapId
     );
   }
 
@@ -264,6 +292,8 @@ class StampEditor extends AnnotationEditor {
 
     super.render();
     this.div.hidden = true;
+
+    this.addAltTextButton();
 
     if (this.#bitmap) {
       this.#createCanvas();
@@ -315,7 +345,12 @@ class StampEditor extends AnnotationEditor {
     this._uiManager.enableWaiting(false);
     const canvas = (this.#canvas = document.createElement("canvas"));
     div.append(canvas);
-    div.hidden = false;
+    if (
+      !this._uiManager.useNewAltTextWhenAddingImage ||
+      !this._uiManager.useNewAltTextFlow
+    ) {
+      div.hidden = false;
+    }
     this.#drawBitmap(width, height);
     this.#createObserver();
     if (!this.#hasBeenAddedInUndoStack) {
@@ -326,20 +361,94 @@ class StampEditor extends AnnotationEditor {
     // There are multiple ways to add an image to the page, so here we just
     // count the number of times an image is added to the page whatever the way
     // is.
-    this._uiManager._eventBus.dispatch("reporttelemetry", {
-      source: this,
-      details: {
-        type: "editing",
-        subtype: this.editorType,
-        data: {
-          action: "inserted_image",
-        },
-      },
+    this._reportTelemetry({
+      action: "inserted_image",
     });
-    this.addAltTextButton();
     if (this.#bitmapFileName) {
       canvas.setAttribute("aria-label", this.#bitmapFileName);
     }
+  }
+
+  copyCanvas(maxDimension, createImageData = false) {
+    const { width: bitmapWidth, height: bitmapHeight } = this.#bitmap;
+    const canvas = document.createElement("canvas");
+
+    let bitmap = this.#bitmap;
+    let width = bitmapWidth,
+      height = bitmapHeight;
+    if (bitmapWidth > maxDimension || bitmapHeight > maxDimension) {
+      const ratio = Math.min(
+        maxDimension / bitmapWidth,
+        maxDimension / bitmapHeight
+      );
+      width = Math.floor(bitmapWidth * ratio);
+      height = Math.floor(bitmapHeight * ratio);
+
+      if (!this.#isSvg) {
+        bitmap = this.#scaleBitmap(width, height);
+      }
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.filter = this._uiManager.hcmFilter;
+
+    // Add a checkerboard pattern as a background in case the image has some
+    // transparency.
+    let white = "white",
+      black = "#cfcfd8";
+    if (this._uiManager.hcmFilter !== "none") {
+      black = "black";
+    } else if (window.matchMedia?.("(prefers-color-scheme: dark)").matches) {
+      white = "#8f8f9d";
+      black = "#42414d";
+    }
+    const boxDim = 15;
+    const pattern = new OffscreenCanvas(boxDim * 2, boxDim * 2);
+    const patternCtx = pattern.getContext("2d");
+    patternCtx.fillStyle = white;
+    patternCtx.fillRect(0, 0, boxDim * 2, boxDim * 2);
+    patternCtx.fillStyle = black;
+    patternCtx.fillRect(0, 0, boxDim, boxDim);
+    patternCtx.fillRect(boxDim, boxDim, boxDim, boxDim);
+    ctx.fillStyle = ctx.createPattern(pattern, "repeat");
+    ctx.fillRect(0, 0, width, height);
+
+    if (createImageData) {
+      const offscreen = new OffscreenCanvas(width, height);
+      const offscreenCtx = offscreen.getContext("2d", {
+        willReadFrequently: true,
+      });
+      offscreenCtx.drawImage(
+        bitmap,
+        0,
+        0,
+        bitmap.width,
+        bitmap.height,
+        0,
+        0,
+        width,
+        height
+      );
+      const data = offscreenCtx.getImageData(0, 0, width, height).data;
+      ctx.drawImage(offscreen, 0, 0);
+
+      return { canvas, imageData: { width, height, data } };
+    }
+
+    ctx.drawImage(
+      bitmap,
+      0,
+      0,
+      bitmap.width,
+      bitmap.height,
+      0,
+      0,
+      width,
+      height
+    );
+    return { canvas, imageData: null };
   }
 
   /**
@@ -431,6 +540,7 @@ class StampEditor extends AnnotationEditor {
     const bitmap = this.#isSvg
       ? this.#bitmap
       : this.#scaleBitmap(width, height);
+
     const ctx = canvas.getContext("2d");
     ctx.filter = this._uiManager.hcmFilter;
     ctx.drawImage(
@@ -502,6 +612,11 @@ class StampEditor extends AnnotationEditor {
    * Create the resize observer.
    */
   #createObserver() {
+    if (!this._uiManager._signal) {
+      // This method is called after the canvas has been created but the canvas
+      // creation is async, so it's possible that the viewer has been closed.
+      return;
+    }
     this.#observer = new ResizeObserver(entries => {
       const rect = entries[0].contentRect;
       if (rect.width && rect.height) {
@@ -509,6 +624,14 @@ class StampEditor extends AnnotationEditor {
       }
     });
     this.#observer.observe(this.div);
+    this._uiManager._signal.addEventListener(
+      "abort",
+      () => {
+        this.#observer?.disconnect();
+        this.#observer = null;
+      },
+      { once: true }
+    );
   }
 
   /** @inheritdoc */
@@ -557,11 +680,11 @@ class StampEditor extends AnnotationEditor {
       // of this annotation and the clipboard doesn't support ImageBitmaps,
       // hence we serialize the bitmap to a data url.
       serialized.bitmapUrl = this.#serializeBitmap(/* toUrl = */ true);
-      serialized.accessibilityData = this.altTextData;
+      serialized.accessibilityData = this.serializeAltText(true);
       return serialized;
     }
 
-    const { decorative, altText } = this.altTextData;
+    const { decorative, altText } = this.serializeAltText(false);
     if (!decorative && altText) {
       serialized.accessibilityData = { type: "Figure", alt: altText };
     }
