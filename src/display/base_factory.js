@@ -30,7 +30,15 @@ class BaseFilterFactory {
     return "none";
   }
 
-  addHighlightHCMFilter(fgColor, bgColor, newFgColor, newBgColor) {
+  addAlphaFilter(map) {
+    return "none";
+  }
+
+  addLuminosityFilter(map) {
+    return "none";
+  }
+
+  addHighlightHCMFilter(filterName, fgColor, bgColor, newFgColor, newBgColor) {
     return "none";
   }
 
@@ -38,10 +46,13 @@ class BaseFilterFactory {
 }
 
 class BaseCanvasFactory {
-  constructor() {
+  #enableHWA = false;
+
+  constructor({ enableHWA = false } = {}) {
     if (this.constructor === BaseCanvasFactory) {
       unreachable("Cannot initialize BaseCanvasFactory.");
     }
+    this.#enableHWA = enableHWA;
   }
 
   create(width, height) {
@@ -51,7 +62,9 @@ class BaseCanvasFactory {
     const canvas = this._createCanvas(width, height);
     return {
       canvas,
-      context: canvas.getContext("2d"),
+      context: canvas.getContext("2d", {
+        willReadFrequently: !this.#enableHWA,
+      }),
     };
   }
 
@@ -98,8 +111,7 @@ class BaseCMapReaderFactory {
   async fetch({ name }) {
     if (!this.baseUrl) {
       throw new Error(
-        'The CMap "baseUrl" parameter must be specified, ensure that ' +
-          'the "cMapUrl" and "cMapPacked" API parameters are provided.'
+        "Ensure that the `cMapUrl` and `cMapPacked` API parameters are provided."
       );
     }
     if (!name) {
@@ -136,8 +148,7 @@ class BaseStandardFontDataFactory {
   async fetch({ filename }) {
     if (!this.baseUrl) {
       throw new Error(
-        'The standard font "baseUrl" parameter must be specified, ensure that ' +
-          'the "standardFontDataUrl" API parameter is provided.'
+        "Ensure that the `standardFontDataUrl` API parameter is provided."
       );
     }
     if (!filename) {

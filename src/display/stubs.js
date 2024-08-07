@@ -16,21 +16,19 @@
 const NodeCanvasFactory = null;
 const NodeCMapReaderFactory = null;
 const NodeFilterFactory = null;
+const NodePackages = null;
 const NodeStandardFontDataFactory = null;
-const NullL10n = null;
 const PDFFetchStream = null;
 const PDFNetworkStream = null;
 const PDFNodeStream = null;
-const SVGGraphics = null;
 
 export {
   NodeCanvasFactory,
   NodeCMapReaderFactory,
   NodeFilterFactory,
+  NodePackages,
   NodeStandardFontDataFactory,
-  NullL10n,
   PDFFetchStream,
   PDFNetworkStream,
   PDFNodeStream,
-  SVGGraphics,
 };

@@ -22,12 +22,11 @@
     "browser": true,
     "es2022": true,
     "worker": true,
-    "amd": true,
   },
 
   "globals": {
-    "PDFJSDev": false,
-    "exports": false,
+    "PDFJSDev": "readonly",
+    "__non_webpack_import__": "readonly",
   },
 
   "rules": {
@@ -39,10 +38,11 @@
     "import/named": "error",
     "import/no-cycle": "error",
     "import/no-empty-named-blocks": "error",
+    "import/no-commonjs": "error",
     "import/no-mutable-exports": "error",
     "import/no-self-import": "error",
     "import/no-unresolved": ["error", {
-      "ignore": ["display", "pdfjs", "pdfjs-lib", "pdfjs-web", "web"]
+      "ignore": ["display", "pdfjs", "pdfjs-lib", "pdfjs-web", "web", "fluent-bundle", "fluent-dom"],
     }],
     "mozilla/avoid-removeChild": "error",
     "mozilla/use-includes-instead-of-indexOf": "error",
@@ -142,9 +142,10 @@
     "no-lone-blocks": "error",
     "no-lonely-if": "error",
     "no-multi-str": "error",
-    "no-new-func": "error",
-    "no-new-wrappers": "error",
     "no-new": "error",
+    "no-new-func": "error",
+    "no-new-symbol": "error",
+    "no-new-wrappers": "error",
     "no-octal-escape": "error",
     "no-octal": "error",
     "no-redeclare": "error",
@@ -242,9 +243,9 @@
     }],
 
     // ECMAScript 6
+    "arrow-body-style": ["error", "as-needed"],
     "constructor-super": "error",
     "no-class-assign": "error",
-    "no-confusing-arrow": "error",
     "no-const-assign": "error",
     "no-dupe-class-members": "error",
     "no-duplicate-imports": "error",
@@ -257,6 +258,7 @@
       "avoidQuotes": true,
     }],
     "prefer-const": "error",
+    "require-yield": "error",
     "sort-imports": ["error", {
       "ignoreCase": true,
     }],

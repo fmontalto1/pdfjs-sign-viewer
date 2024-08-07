@@ -24,14 +24,19 @@ async function runTests(results) {
     random: false,
     spec_dir: "integration",
     spec_files: [
-      "accessibility_spec.js",
-      "annotation_spec.js",
-      "copy_paste_spec.js",
-      "find_spec.js",
-      "freetext_editor_spec.js",
-      "ink_editor_spec.js",
-      "scripting_spec.js",
-      "stamp_editor_spec.js",
+      "accessibility_spec.mjs",
+      "annotation_spec.mjs",
+      "caret_browsing_spec.mjs",
+      "copy_paste_spec.mjs",
+      "find_spec.mjs",
+      "freetext_editor_spec.mjs",
+      "highlight_editor_spec.mjs",
+      "ink_editor_spec.mjs",
+      "scripting_spec.mjs",
+      "stamp_editor_spec.mjs",
+      "text_field_spec.mjs",
+      "text_layer_spec.mjs",
+      "viewer_spec.mjs",
     ],
   });
 
@@ -39,6 +44,7 @@ async function runTests(results) {
     jasmineDone(suiteInfo) {},
     jasmineStarted(suiteInfo) {},
     specDone(result) {
+      // Report on the result of individual tests.
       ++results.runs;
       if (result.failedExpectations.length > 0) {
         ++results.failures;
@@ -48,8 +54,20 @@ async function runTests(results) {
       }
     },
     specStarted(result) {},
-    suiteDone(result) {},
-    suiteStarted(result) {},
+    suiteDone(result) {
+      // Report on the result of `afterAll` invocations.
+      if (result.failedExpectations.length > 0) {
+        ++results.failures;
+        console.log(`TEST-UNEXPECTED-FAIL | ${result.description}`);
+      }
+    },
+    suiteStarted(result) {
+      // Report on the result of `beforeAll` invocations.
+      if (result.failedExpectations.length > 0) {
+        ++results.failures;
+        console.log(`TEST-UNEXPECTED-FAIL | ${result.description}`);
+      }
+    },
   });
 
   return jasmine.execute();

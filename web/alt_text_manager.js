@@ -13,14 +13,14 @@
  * limitations under the License.
  */
 
-import { shadow } from "pdfjs-lib";
+import { DOMSVGFactory, shadow } from "pdfjs-lib";
 
 class AltTextManager {
   #boundUpdateUIState = this.#updateUIState.bind(this);
 
   #boundSetPosition = this.#setPosition.bind(this);
 
-  #boundPointerDown = this.#pointerDown.bind(this);
+  #boundOnClick = this.#onClick.bind(this);
 
   #currentEditor = null;
 
@@ -46,6 +46,14 @@ class AltTextManager {
 
   #previousAltText = null;
 
+  #svgElement = null;
+
+  #rectElement = null;
+
+  #container;
+
+  #telemetryData = null;
+
   constructor(
     {
       dialog,
@@ -55,6 +63,7 @@ class AltTextManager {
       cancelButton,
       saveButton,
     },
+    container,
     overlayManager,
     eventBus
   ) {
@@ -66,13 +75,18 @@ class AltTextManager {
     this.#saveButton = saveButton;
     this.#overlayManager = overlayManager;
     this.#eventBus = eventBus;
+    this.#container = container;
 
     dialog.addEventListener("close", this.#close.bind(this));
-    cancelButton.addEventListener("click", this.#cancel.bind(this));
+    dialog.addEventListener("contextmenu", event => {
+      if (event.target !== this.#textarea) {
+        event.preventDefault();
+      }
+    });
+    cancelButton.addEventListener("click", this.#finish.bind(this));
     saveButton.addEventListener("click", this.#save.bind(this));
     optionDescription.addEventListener("change", this.#boundUpdateUIState);
     optionDecorative.addEventListener("change", this.#boundUpdateUIState);
-    textarea.addEventListener("input", this.#boundUpdateUIState);
 
     this.#overlayManager.register(dialog);
   }
@@ -87,14 +101,49 @@ class AltTextManager {
     ]);
   }
 
+  #createSVGElement() {
+    if (this.#svgElement) {
+      return;
+    }
+
+    // We create a mask to add to the dialog backdrop: the idea is to have a
+    // darken background everywhere except on the editor to clearly see the
+    // picture to describe.
+
+    const svgFactory = new DOMSVGFactory();
+    const svg = (this.#svgElement = svgFactory.createElement("svg"));
+    svg.setAttribute("width", "0");
+    svg.setAttribute("height", "0");
+    const defs = svgFactory.createElement("defs");
+    svg.append(defs);
+    const mask = svgFactory.createElement("mask");
+    defs.append(mask);
+    mask.setAttribute("id", "alttext-manager-mask");
+    mask.setAttribute("maskContentUnits", "objectBoundingBox");
+    let rect = svgFactory.createElement("rect");
+    mask.append(rect);
+    rect.setAttribute("fill", "white");
+    rect.setAttribute("width", "1");
+    rect.setAttribute("height", "1");
+    rect.setAttribute("x", "0");
+    rect.setAttribute("y", "0");
+
+    rect = this.#rectElement = svgFactory.createElement("rect");
+    mask.append(rect);
+    rect.setAttribute("fill", "black");
+    this.#dialog.append(svg);
+  }
+
   async editAltText(uiManager, editor) {
     if (this.#currentEditor || !editor) {
       return;
     }
 
+    this.#createSVGElement();
+
     this.#hasUsedPointer = false;
     for (const element of this._elements) {
-      element.addEventListener("pointerdown", this.#boundPointerDown);
+      element.addEventListener("click", this.#boundOnClick);
     }
 
     const { altText, decorative } = editor.altTextData;
@@ -128,14 +177,29 @@ class AltTextManager {
     }
     const dialog = this.#dialog;
     const { style } = dialog;
+    const {
+      x: containerX,
+      y: containerY,
+      width: containerW,
+      height: containerH,
+    } = this.#container.getBoundingClientRect();
     const { innerWidth: windowW, innerHeight: windowH } = window;
     const { width: dialogW, height: dialogH } = dialog.getBoundingClientRect();
     const { x, y, width, height } = this.#currentEditor.getClientDimensions();
     const MARGIN = 10;
     const isLTR = this.#uiManager.direction === "ltr";
 
+    const xs = Math.max(x, containerX);
+    const xe = Math.min(x + width, containerX + containerW);
+    const ys = Math.max(y, containerY);
+    const ye = Math.min(y + height, containerY + containerH);
+    this.#rectElement.setAttribute("width", `${(xe - xs) / windowW}`);
+    this.#rectElement.setAttribute("height", `${(ye - ys) / windowH}`);
+    this.#rectElement.setAttribute("x", `${xs / windowW}`);
+    this.#rectElement.setAttribute("y", `${ys / windowH}`);
+
     let left = null;
-    let top = y;
+    let top = Math.max(y, 0);
     top += Math.min(windowH - (top + dialogH), 0);
 
     if (isLTR) {
@@ -153,7 +217,7 @@ class AltTextManager {
 
     if (left === null) {
       top = null;
-      left = x;
+      left = Math.max(x, 0);
       left += Math.min(windowW - (left + dialogW), 0);
       if (y > dialogH + MARGIN) {
         top = y - dialogH - MARGIN;
@@ -183,35 +247,25 @@ class AltTextManager {
     }
   }
 
-  #cancel() {
-    this.#eventBus.dispatch("reporttelemetry", {
-      source: this,
-      details: {
-        type: "editing",
-        subtype: this.#currentEditor.editorType,
-        data: {
-          action: "alt_text_cancel",
-          alt_text_keyboard: !this.#hasUsedPointer,
-        },
-      },
-    });
-    this.#finish();
-  }
-
   #close() {
-    this.#removePointerDownListeners();
+    this.#currentEditor._reportTelemetry(
+      this.#telemetryData || {
+        action: "alt_text_cancel",
+        alt_text_keyboard: !this.#hasUsedPointer,
+      }
+    );
+    this.#telemetryData = null;
+
+    this.#removeOnClickListeners();
     this.#uiManager?.addEditListeners();
     this.#eventBus._off("resize", this.#boundSetPosition);
+    this.#currentEditor.altTextFinish();
     this.#currentEditor = null;
     this.#uiManager = null;
   }
 
   #updateUIState() {
-    const hasAltText = !!this.#textarea.value.trim();
-    const decorative = this.#optionDecorative.checked;
-
-    this.#textarea.disabled = decorative;
-    this.#saveButton.disabled = !decorative && !hasAltText;
+    this.#textarea.disabled = this.#optionDecorative.checked;
   }
 
   #save() {
@@ -221,39 +275,36 @@ class AltTextManager {
       altText,
       decorative,
     };
-    this.#eventBus.dispatch("reporttelemetry", {
-      source: this,
-      details: {
-        type: "editing",
-        subtype: this.#currentEditor.editorType,
-        data: {
-          action: "alt_text_save",
-          alt_text_description: !!altText,
-          alt_text_edit:
-            !!this.#previousAltText && this.#previousAltText !== altText,
-          alt_text_decorative: decorative,
-          alt_text_keyboard: !this.#hasUsedPointer,
-        },
-      },
-    });
+    this.#telemetryData = {
+      action: "alt_text_save",
+      alt_text_description: !!altText,
+      alt_text_edit:
+        !!this.#previousAltText && this.#previousAltText !== altText,
+      alt_text_decorative: decorative,
+      alt_text_keyboard: !this.#hasUsedPointer,
+    };
     this.#finish();
   }
 
-  #pointerDown() {
+  #onClick(evt) {
+    if (evt.detail === 0) {
+      return; // The keyboard was used.
+    }
     this.#hasUsedPointer = true;
-    this.#removePointerDownListeners();
+    this.#removeOnClickListeners();
   }
 
-  #removePointerDownListeners() {
+  #removeOnClickListeners() {
     for (const element of this._elements) {
-      element.removeEventListener("pointerdown", this.#boundPointerDown);
+      element.removeEventListener("click", this.#boundOnClick);
     }
   }
 
   destroy() {
-    this.#currentEditor = null;
-    this.#uiManager = null;
+    this.#uiManager = null; // Avoid re-adding the edit listeners.
     this.#finish();
+    this.#svgElement?.remove();
+    this.#svgElement = this.#rectElement = null;
   }
 }
 

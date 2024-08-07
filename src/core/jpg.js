@@ -19,7 +19,7 @@ import { readUint16 } from "./core_utils.js";
 
 class JpegError extends BaseException {
   constructor(msg) {
-    super(`JPEG error: ${msg}`, "JpegError");
+    super(msg, "JpegError");
   }
 }
 
@@ -1073,6 +1073,9 @@ class JpegImage {
       offset += 2;
     }
 
+    if (!frame) {
+      throw new JpegError("JpegImage.parse - no frame data found.");
+    }
     this.width = frame.samplesPerLine;
     this.height = frame.scanLines;
     this.jfif = jfif;
@@ -1577,4 +1580,4 @@ class JpegImage {
   }
 }
 
-export { JpegImage };
+export { JpegError, JpegImage };
