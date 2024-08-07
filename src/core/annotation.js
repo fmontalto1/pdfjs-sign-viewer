@@ -3650,7 +3650,7 @@ class SignatureWidgetAnnotation extends WidgetAnnotation {
     // to the main-thread (issue 10347).
     this.data.fieldValue = null;
     this.data.hasOwnCanvas = this.data.noRotate;
-    this.data.noHTML = !this.data.hasOwnCanvas;
+    this.data.noHTML = false; // The requirement is that signature annotations must be visible
   }
 
   getFieldObject() {
