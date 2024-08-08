@@ -484,6 +484,16 @@ if (typeof PDFJSDev === "undefined" || !PDFJSDev.test("MOZCENTRAL")) {
     value: true,
     kind: OptionKind.VIEWER,
   };
+  defaultOptions.viewerFieldParameters = {
+    /** @type {Object} */
+    value: null,
+    kind: OptionKind.VIEWER
+  };
+  defaultOptions.showSignatureWidgetAnnotationEmpty = {
+    /** @type {boolean} */
+    value: true,
+    kind: OptionKind.VIEWER
+  };
 }
 if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
   defaultOptions.disablePreferences = {
