@@ -385,6 +385,21 @@ const PDFViewerApplication = {
           parseInt(params.get("spreadmodeonload"))
         );
       }
+      if (params.has("enablealttext")) {
+        AppOptions.set("enableAltText", params.get("enablealttext") === "true");
+      }
+      if (params.has("enableupdatedaddimage")) {
+        AppOptions.set(
+          "enableUpdatedAddImage",
+          params.get("enableupdatedaddimage") === "true"
+        );
+      }
+      if (params.has("enableguessalttext")) {
+        AppOptions.set(
+          "enableGuessAltText",
+          params.get("enableguessalttext") === "true"
+        );
+      }
     }
   },
 
@@ -404,9 +419,7 @@ const PDFViewerApplication = {
     } else {
       eventBus = new EventBus();
     }
-    if (this.mlManager) {
-      this.mlManager.eventBus = eventBus;
-    }
+    this.mlManager?.setEventBus(eventBus, this._globalAbortController.signal);
     this.eventBus = eventBus;
 
     this.overlayManager = new OverlayManager();
@@ -540,7 +553,11 @@ const PDFViewerApplication = {
     }
 
     if (appConfig.annotationEditorParams) {
-      if (annotationEditorMode !== AnnotationEditorType.DISABLE) {
+      if (
+        ((typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) ||
+          typeof AbortSignal.any === "function") &&
+        annotationEditorMode !== AnnotationEditorType.DISABLE
+      ) {
         const editorHighlightButton = appConfig.toolbar?.editorHighlightButton;
         if (editorHighlightButton && AppOptions.get("enableHighlightEditor")) {
           editorHighlightButton.hidden = false;

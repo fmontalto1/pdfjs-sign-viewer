@@ -797,10 +797,8 @@ class PDFViewer {
       this.findController?.setDocument(null);
       this._scriptingManager?.setDocument(null);
 
-      if (this.#annotationEditorUIManager) {
-        this.#annotationEditorUIManager.destroy();
-        this.#annotationEditorUIManager = null;
-      }
+      this.#annotationEditorUIManager?.destroy();
+      this.#annotationEditorUIManager = null;
     }
 
     this.pdfDocument = pdfDocument;
@@ -882,7 +880,11 @@ class PDFViewer {
           viewer.before(element);
         }
 
-        if (annotationEditorMode !== AnnotationEditorType.DISABLE) {
+        if (
+          ((typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) ||
+            typeof AbortSignal.any === "function") &&
+          annotationEditorMode !== AnnotationEditorType.DISABLE
+        ) {
           const mode = annotationEditorMode;
 
           if (pdfDocument.isPureXfa) {

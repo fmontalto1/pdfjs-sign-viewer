@@ -104,6 +104,22 @@ class StampEditor extends AnnotationEditor {
     super.altTextFinish();
   }
 
+  /** @inheritdoc */
+  get telemetryFinalData() {
+    return {
+      type: "stamp",
+      hasAltText: this.hasAltTextData(),
+    };
+  }
+
+  static computeTelemetryFinalData(data) {
+    const hasAltTextStats = data.get("hasAltText");
+    return {
+      hasAltText: hasAltTextStats.get(true) ?? 0,
+      hasNoAltText: hasAltTextStats.get(false) ?? 0,
+    };
+  }
+
   #getBitmapFetched(data, fromId = false) {
     if (!data) {
       this.remove();
@@ -141,9 +157,15 @@ class StampEditor extends AnnotationEditor {
       this._uiManager.useNewAltTextFlow &&
       this.#bitmap
     ) {
-      // The alt-text dialog isn't opened but we still want to guess the alt
-      // text.
-      this.mlGuessAltText();
+      this._reportTelemetry({
+        action: "pdfjs.image.image_added",
+        data: { alt_text_modal: false },
+      });
+      try {
+        // The alt-text dialog isn't opened but we still want to guess the alt
+        // text.
+        this.mlGuessAltText();
+      } catch {}
     }
 
     this.div.focus();
@@ -155,8 +177,11 @@ class StampEditor extends AnnotationEditor {
     }
 
     const { mlManager } = this._uiManager;
-    if (!mlManager || !(await mlManager.isEnabledFor("altText"))) {
-      return null;
+    if (!mlManager) {
+      throw new Error("No ML.");
+    }
+    if (!(await mlManager.isEnabledFor("altText"))) {
+      throw new Error("ML isn't enabled for alt text.");
     }
     const { data, width, height } =
       imageData ||
@@ -170,8 +195,17 @@ class StampEditor extends AnnotationEditor {
         channels: data.length / (width * height),
       },
     });
-    if (!response || response.error || !response.output) {
+    if (!response) {
+      throw new Error("No response from the AI service.");
+    }
+    if (response.error) {
+      throw new Error("Error from the AI service.");
+    }
+    if (response.cancel) {
       return null;
+    }
+    if (!response.output) {
+      throw new Error("No valid response from the AI service.");
     }
     const altText = response.output;
     await this.setGuessedAltText(altText);
@@ -233,6 +267,10 @@ class StampEditor extends AnnotationEditor {
             const data = await this._uiManager.imageManager.getFromFile(
               input.files[0]
             );
+            this._reportTelemetry({
+              action: "pdfjs.image.image_selected",
+              data: { alt_text_modal: this._uiManager.useNewAltTextFlow },
+            });
             this.#getBitmapFetched(data);
           }
           if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("TESTING")) {
