@@ -114,6 +114,11 @@ class NewAltTextManager {
     createAutomaticallyButton.addEventListener("click", async () => {
       const checked =
         createAutomaticallyButton.getAttribute("aria-pressed") !== "true";
+      this.#currentEditor._reportTelemetry({
+        action: "pdfjs.image.alt_text.ai_generation_check",
+        data: { status: checked },
+      });
+
       if (this.#uiManager) {
         this.#uiManager.setPreference("enableGuessAltText", checked);
         await this.#uiManager.mlManager.toggleService("altText", checked);
@@ -172,7 +177,9 @@ class NewAltTextManager {
     this.#isEditing = isEditing;
     this.#title.setAttribute(
       "data-l10n-id",
-      `pdfjs-editor-new-alt-text-dialog-${isEditing ? "edit" : "add"}-label`
+      isEditing
+        ? "pdfjs-editor-new-alt-text-dialog-edit-label"
+        : "pdfjs-editor-new-alt-text-dialog-add-label"
     );
   }
 
@@ -416,7 +423,7 @@ class NewAltTextManager {
     });
     this.#currentEditor._reportTelemetry({
       action: "pdfjs.image.image_added",
-      data: { alt_text_modal: false },
+      data: { alt_text_modal: true, alt_text_type: "skipped" },
     });
     this.#finish();
   }
@@ -464,7 +471,10 @@ class NewAltTextManager {
     }
     this.#currentEditor._reportTelemetry({
       action: "pdfjs.image.image_added",
-      data: { alt_text_modal: true },
+      data: {
+        alt_text_modal: true,
+        alt_text_type: altText ? "present" : "empty",
+      },
     });
 
     this.#currentEditor._reportTelemetry({
