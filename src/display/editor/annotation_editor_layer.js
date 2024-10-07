@@ -22,6 +22,8 @@
 // eslint-disable-next-line max-len
 /** @typedef {import("../annotation_layer.js").AnnotationLayer} AnnotationLayer */
 /** @typedef {import("../draw_layer.js").DrawLayer} DrawLayer */
+// eslint-disable-next-line max-len
+/** @typedef {import("../src/display/struct_tree_layer_builder.js").StructTreeLayerBuilder} StructTreeLayerBuilder */
 
 import { AnnotationEditorType, FeatureTest } from "../../shared/util.js";
 import { AnnotationEditor } from "./editor.js";
@@ -35,6 +37,7 @@ import { StampEditor } from "./stamp.js";
  * @typedef {Object} AnnotationEditorLayerOptions
  * @property {Object} mode
  * @property {HTMLDivElement} div
+ * @property {StructTreeLayerBuilder} structTreeLayer
  * @property {AnnotationEditorUIManager} uiManager
  * @property {boolean} enabled
  * @property {TextAccessibilityManager} [accessibilityManager]
@@ -95,6 +98,7 @@ class AnnotationEditorLayer {
     uiManager,
     pageIndex,
     div,
+    structTreeLayer,
     accessibilityManager,
     annotationLayer,
     drawLayer,
@@ -119,6 +123,7 @@ class AnnotationEditorLayer {
     this.viewport = viewport;
     this.#textLayer = textLayer;
     this.drawLayer = drawLayer;
+    this._structTree = structTreeLayer;
 
     this.#uiManager.addLayer(this);
   }
@@ -244,7 +249,7 @@ class AnnotationEditorLayer {
    * Enable pointer events on the main div in order to enable
    * editor creation.
    */
-  enable() {
+  async enable() {
     this.div.tabIndex = 0;
     this.togglePointerEvents(true);
     const annotationElementIds = new Set();
@@ -271,7 +276,7 @@ class AnnotationEditorLayer {
       if (annotationElementIds.has(editable.data.id)) {
         continue;
       }
-      const editor = this.deserialize(editable);
+      const editor = await this.deserialize(editable);
       if (!editor) {
         continue;
       }
@@ -657,11 +662,11 @@ class AnnotationEditorLayer {
    * @param {Object} data
    * @returns {AnnotationEditor | null}
    */
-  deserialize(data) {
+  async deserialize(data) {
     return (
-      AnnotationEditorLayer.#editorTypes
+      (await AnnotationEditorLayer.#editorTypes
         .get(data.annotationType ?? data.annotationEditorType)
-        ?.deserialize(data, this, this.#uiManager) || null
+        ?.deserialize(data, this, this.#uiManager)) || null
     );
   }
 
