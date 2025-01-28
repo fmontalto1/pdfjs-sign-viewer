@@ -572,7 +572,7 @@ body {
   mask-image: var(--toolbarButton-editorStamp-icon);
 }
 
-:is(#printButton, #secondaryPrint)::before {
+#printButton::before {
   mask-image: var(--toolbarButton-print-icon);
 }
 
@@ -582,7 +582,7 @@ body {
 }
 /*#endif*/
 
-:is(#downloadButton, #secondaryDownload)::before {
+#downloadButton::before {
   mask-image: var(--toolbarButton-download-icon);
 }
 
@@ -634,14 +634,14 @@ body {
 .toggleButton {
   display: inline;
 
-  &:is(:hover, :has(> input:focus-visible)) {
-    color: var(--toggled-btn-color);
-    background-color: var(--button-hover-color);
-  }
-
   &:has(> input:checked) {
     color: var(--toggled-btn-color);
     background-color: var(--toggled-btn-bg-color);
+  }
+
+  &:is(:hover, :has(> input:focus-visible)) {
+    color: var(--toggled-btn-color);
+    background-color: var(--button-hover-color);
   }
 
   & > input {
@@ -996,6 +996,7 @@ dialog :link {
   font: message-box;
   flex: none;
   position: relative;
+  padding: 0;
 
   > span {
     display: inline-block;

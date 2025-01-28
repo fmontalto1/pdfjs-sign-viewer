@@ -219,7 +219,9 @@ class PDFImage {
       this.numComps = this.colorSpace.numComps;
 
       if (this.jpxDecoderOptions) {
-        this.jpxDecoderOptions.numComponents = hasColorSpace ? this.numComp : 0;
+        this.jpxDecoderOptions.numComponents = hasColorSpace
+          ? this.numComps
+          : 0;
         // If the jpx image has a color space then it musn't be used in order to
         // be able to use the color space that comes from the pdf.
         this.jpxDecoderOptions.isIndexedColormap =
@@ -705,7 +707,7 @@ class PDFImage {
       isOffscreenCanvasSupported &&
       ImageResizer.needsToBeResized(drawWidth, drawHeight);
 
-    if (this.colorSpace.name === "DeviceRGBA") {
+    if (!this.smask && !this.mask && this.colorSpace.name === "DeviceRGBA") {
       imgData.kind = ImageKind.RGBA_32BPP;
       const imgArray = (imgData.data = await this.getImageBytes(
         originalHeight * originalWidth * 4,
@@ -752,6 +754,10 @@ class PDFImage {
         drawWidth === originalWidth &&
         drawHeight === originalHeight
       ) {
+        const image = await this.#getImage(originalWidth, originalHeight);
+        if (image) {
+          return image;
+        }
         const data = await this.getImageBytes(originalHeight * rowBytes, {});
         if (isOffscreenCanvasSupported) {
           if (mustBeResized) {
@@ -810,6 +816,10 @@ class PDFImage {
           }
 
           if (isHandled) {
+            const image = await this.#getImage(drawWidth, drawHeight);
+            if (image) {
+              return image;
+            }
             const rgba = await this.getImageBytes(imageLength, {
               drawWidth,
               drawHeight,
@@ -1004,6 +1014,20 @@ class PDFImage {
     ctx.putImageData(imgData, 0, 0);
     const bitmap = canvas.transferToImageBitmap();
 
+    return {
+      data: null,
+      width,
+      height,
+      bitmap,
+      interpolate: this.interpolate,
+    };
+  }
+
+  async #getImage(width, height) {
+    const bitmap = await this.image.getTransferableImage();
+    if (!bitmap) {
+      return null;
+    }
     return {
       data: null,
       width,

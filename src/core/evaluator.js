@@ -12,12 +12,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/* eslint-disable no-var */
 
 import {
   AbortException,
   assert,
-  CMapCompressionType,
   FONT_IDENTITY_MATRIX,
   FormatError,
   IDENTITY_MATRIX,
@@ -34,6 +32,12 @@ import {
 import { CMapFactory, IdentityCMap } from "./cmap.js";
 import { Cmd, Dict, EOF, isName, Name, Ref, RefSet } from "./primitives.js";
 import { ErrorFont, Font } from "./fonts.js";
+import {
+  fetchBinaryData,
+  isNumberArray,
+  lookupMatrix,
+  lookupNormalRect,
+} from "./core_utils.js";
 import {
   getEncoding,
   MacRomanEncoding,
@@ -53,7 +57,6 @@ import {
 import { getTilingPatternIR, Pattern } from "./pattern.js";
 import { getXfaFontDict, getXfaFontName } from "./xfa_fonts.js";
 import { IdentityToUnicodeMap, ToUnicodeMap } from "./to_unicode_map.js";
-import { isNumberArray, lookupMatrix, lookupNormalRect } from "./core_utils.js";
 import { isPDFFunction, PDFFunctionFactory } from "./function.js";
 import { Lexer, Parser } from "./parser.js";
 import {
@@ -63,7 +66,6 @@ import {
   LocalTilingPatternCache,
   RegionalImageCache,
 } from "./image_utils.js";
-import { NullStream, Stream } from "./stream.js";
 import { BaseStream } from "./base_stream.js";
 import { bidi } from "./bidi.js";
 import { ColorSpace } from "./colorspace.js";
@@ -74,9 +76,12 @@ import { getGlyphsUnicode } from "./glyphlist.js";
 import { getMetrics } from "./metrics.js";
 import { getUnicodeForGlyph } from "./unicode.js";
 import { ImageResizer } from "./image_resizer.js";
+import { JpegStream } from "./jpeg_stream.js";
+import { JpxImage } from "./jpx.js";
 import { MurmurHash3_64 } from "../shared/murmurhash3.js";
 import { OperatorList } from "./operator_list.js";
 import { PDFImage } from "./image.js";
+import { Stream } from "./stream.js";
 
 const DefaultPartialEvaluatorOptions = Object.freeze({
   maxImageSize: -1,
@@ -84,11 +89,13 @@ const DefaultPartialEvaluatorOptions = Object.freeze({
   ignoreErrors: false,
   isEvalSupported: true,
   isOffscreenCanvasSupported: false,
+  isImageDecoderSupported: false,
   canvasMaxAreaInBytes: -1,
   fontExtraProperties: false,
   useSystemFonts: true,
   cMapUrl: null,
   standardFontDataUrl: null,
+  wasmUrl: null,
 });
 
 const PatternType = {
@@ -175,7 +182,7 @@ function addLocallyCachedImageOps(opList, data) {
   if (data.objId) {
     opList.addDependency(data.objId);
   }
-  opList.addImageOps(data.fn, data.args, data.optionalContent);
+  opList.addImageOps(data.fn, data.args, data.optionalContent, data.hasMask);
 
   if (data.fn === OPS.paintImageMaskXObject && data.args[0]?.count > 0) {
     data.args[0].count++;
@@ -233,7 +240,13 @@ class PartialEvaluator {
 
     this._regionalImageCache = new RegionalImageCache();
     this._fetchBuiltInCMapBound = this.fetchBuiltInCMap.bind(this);
-    ImageResizer.setMaxArea(this.options.canvasMaxAreaInBytes);
+
+    ImageResizer.setOptions(this.options);
+    JpegStream.setOptions(this.options);
+    JpxImage.setOptions({
+      wasmUrl: this.options.wasmUrl,
+      handler,
+    });
   }
 
   /**
@@ -383,26 +396,17 @@ class PartialEvaluator {
 
     if (this.options.cMapUrl !== null) {
       // Only compressed CMaps are (currently) supported here.
-      const url = `${this.options.cMapUrl}${name}.bcmap`;
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(
-          `fetchBuiltInCMap: failed to fetch file "${url}" with "${response.statusText}".`
-        );
-      }
-      data = {
-        cMapData: new Uint8Array(await response.arrayBuffer()),
-        compressionType: CMapCompressionType.BINARY,
-      };
+      const cMapData = await fetchBinaryData(
+        `${this.options.cMapUrl}${name}.bcmap`
+      );
+      data = { cMapData, isCompressed: true };
     } else {
       // Get the data on the main-thread instead.
       data = await this.handler.sendWithPromise("FetchBuiltInCMap", { name });
     }
+    // Cache the CMap data, to avoid fetching it repeatedly.
+    this.builtInCMapCache.set(name, data);
 
-    if (data.compressionType !== CMapCompressionType.NONE) {
-      // Given the size of uncompressed CMaps, only cache compressed ones.
-      this.builtInCMapCache.set(name, data);
-    }
     return data;
   }
 
@@ -426,30 +430,19 @@ class PartialEvaluator {
       filename = standardFontNameToFileName[name];
     let data;
 
-    if (this.options.standardFontDataUrl !== null) {
-      const url = `${this.options.standardFontDataUrl}${filename}`;
-      const response = await fetch(url);
-      if (!response.ok) {
-        warn(
-          `fetchStandardFontData: failed to fetch file "${url}" with "${response.statusText}".`
+    try {
+      if (this.options.standardFontDataUrl !== null) {
+        data = await fetchBinaryData(
+          `${this.options.standardFontDataUrl}${filename}`
         );
       } else {
-        data = new Uint8Array(await response.arrayBuffer());
-      }
-    } else {
-      // Get the data on the main-thread instead.
-      try {
+        // Get the data on the main-thread instead.
         data = await this.handler.sendWithPromise("FetchStandardFontData", {
           filename,
         });
-      } catch (e) {
-        warn(
-          `fetchStandardFontData: failed to fetch file "${filename}" with "${e}".`
-        );
       }
-    }
-
-    if (!data) {
+    } catch (ex) {
+      warn(ex);
       return null;
     }
     // Cache the "raw" standard font data, to avoid fetching it repeatedly
@@ -738,13 +731,9 @@ class PartialEvaluator {
     }
 
     const SMALL_IMAGE_DIMENSIONS = 200;
+    const hasMask = dict.has("SMask") || dict.has("Mask");
     // Inlining small images into the queue as RGB data
-    if (
-      isInline &&
-      w + h < SMALL_IMAGE_DIMENSIONS &&
-      !dict.has("SMask") &&
-      !dict.has("Mask")
-    ) {
+    if (isInline && w + h < SMALL_IMAGE_DIMENSIONS && !hasMask) {
       try {
         const imageObj = new PDFImage({
           xref: this.xref,
@@ -801,7 +790,12 @@ class PartialEvaluator {
     // Ensure that the dependency is added before the image is decoded.
     operatorList.addDependency(objId);
     args = [objId, w, h];
-    operatorList.addImageOps(OPS.paintImageXObject, args, optionalContent);
+    operatorList.addImageOps(
+      OPS.paintImageXObject,
+      args,
+      optionalContent,
+      hasMask
+    );
 
     if (cacheGlobally) {
       if (this.globalImageCache.hasDecodeFailed(imageRef)) {
@@ -810,6 +804,7 @@ class PartialEvaluator {
           fn: OPS.paintImageXObject,
           args,
           optionalContent,
+          hasMask,
           byteSize: 0, // Data is `null`, since decoding failed previously.
         });
 
@@ -820,7 +815,7 @@ class PartialEvaluator {
       // For large (at least 500x500) or more complex images that we'll cache
       // globally, check if the image is still cached locally on the main-thread
       // to avoid having to re-parse the image (since that can be slow).
-      if (w * h > 250000 || dict.has("SMask") || dict.has("Mask")) {
+      if (w * h > 250000 || hasMask) {
         const localLength = await this.handler.sendWithPromise("commonobj", [
           objId,
           "CopyLocalImage",
@@ -833,6 +828,7 @@ class PartialEvaluator {
             fn: OPS.paintImageXObject,
             args,
             optionalContent,
+            hasMask,
             byteSize: 0, // Temporary entry, to avoid `setData` returning early.
           });
           this.globalImageCache.addByteSize(imageRef, localLength);
@@ -880,6 +876,7 @@ class PartialEvaluator {
         fn: OPS.paintImageXObject,
         args,
         optionalContent,
+        hasMask,
       };
       localImageCache.set(cacheKey, imageRef, cacheData);
 
@@ -892,6 +889,7 @@ class PartialEvaluator {
             fn: OPS.paintImageXObject,
             args,
             optionalContent,
+            hasMask,
             byteSize: 0, // Temporary entry, note `addByteSize` above.
           });
         }
@@ -1136,8 +1134,7 @@ class PartialEvaluator {
     // This array holds the converted/processed state data.
     const gStateObj = [];
     let promise = Promise.resolve();
-    for (const key of gState.getKeys()) {
-      const value = gState.get(key);
+    for (const [key, value] of gState) {
       switch (key) {
         case "Type":
           break;
@@ -1822,7 +1819,8 @@ class PartialEvaluator {
                     operatorList.addImageOps(
                       globalImage.fn,
                       globalImage.args,
-                      globalImage.optionalContent
+                      globalImage.optionalContent,
+                      globalImage.hasMask
                     );
 
                     resolveXObject();
@@ -1893,7 +1891,7 @@ class PartialEvaluator {
             );
             return;
           case OPS.setFont:
-            var fontSize = args[1];
+            const fontSize = args[1];
             // eagerly collect all fonts
             next(
               self
@@ -1919,7 +1917,7 @@ class PartialEvaluator {
             parsingText = false;
             break;
           case OPS.endInlineImage:
-            var cacheKey = args[0].cacheKey;
+            const cacheKey = args[0].cacheKey;
             if (cacheKey) {
               const localImage = localImageCache.getByName(cacheKey);
               if (localImage) {
@@ -1952,8 +1950,8 @@ class PartialEvaluator {
               self.ensureStateFont(stateManager.state);
               continue;
             }
-            var combinedGlyphs = [];
-            var state = stateManager.state;
+            const combinedGlyphs = [],
+              state = stateManager.state;
             for (const arrItem of args[0]) {
               if (typeof arrItem === "string") {
                 combinedGlyphs.push(...self.handleText(arrItem, state));
@@ -3085,6 +3083,8 @@ class PartialEvaluator {
 
       const operation = {};
       let stop,
+        name,
+        isValidName,
         args = [];
       while (!(stop = timeSlotManager.check())) {
         // The arguments parsed by read() are not used beyond this loop, so
@@ -3104,7 +3104,7 @@ class PartialEvaluator {
         switch (fn | 0) {
           case OPS.setFont:
             // Optimization to ignore multiple identical Tf commands.
-            var fontNameArg = args[0].name,
+            const fontNameArg = args[0].name,
               fontSizeArg = args[1];
             if (
               textState.font &&
@@ -3245,12 +3245,10 @@ class PartialEvaluator {
             break;
           case OPS.paintXObject:
             flushTextContentItem();
-            if (!xobjs) {
-              xobjs = resources.get("XObject") || Dict.empty;
-            }
+            xobjs ??= resources.get("XObject") || Dict.empty;
 
-            var isValidName = args[0] instanceof Name;
-            var name = args[0].name;
+            isValidName = args[0] instanceof Name;
+            name = args[0].name;
 
             if (isValidName && emptyXObjectCache.getByName(name)) {
               break;
@@ -4425,12 +4423,20 @@ class PartialEvaluator {
     let fontFile, subtype, length1, length2, length3;
     try {
       fontFile = descriptor.get("FontFile", "FontFile2", "FontFile3");
+
+      if (fontFile) {
+        if (!(fontFile instanceof BaseStream)) {
+          throw new FormatError("FontFile should be a stream");
+        } else if (fontFile.isEmpty) {
+          throw new FormatError("FontFile is empty");
+        }
+      }
     } catch (ex) {
       if (!this.options.ignoreErrors) {
         throw ex;
       }
       warn(`translateFont - fetching "${fontName.name}" font file: "${ex}".`);
-      fontFile = new NullStream();
+      fontFile = null;
     }
     let isInternalFont = false;
     let glyphScaleFactors = null;

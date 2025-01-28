@@ -99,8 +99,11 @@ class DecodeStream extends BaseStream {
     return this.buffer.subarray(pos, end);
   }
 
-  async getImageData(length, decoderOptions = null) {
+  async getImageData(length, decoderOptions) {
     if (!this.canAsyncDecodeImageFromBuffer) {
+      if (this.isAsyncDecoder) {
+        return this.decodeImage(null, decoderOptions);
+      }
       return this.getBytes(length, decoderOptions);
     }
     const data = await this.stream.asyncGetBytes();
@@ -132,6 +135,8 @@ class DecodeStream extends BaseStream {
 
 class StreamsSequenceStream extends DecodeStream {
   constructor(streams, onError = null) {
+    streams = streams.filter(s => s instanceof BaseStream);
+
     let maybeLength = 0;
     for (const stream of streams) {
       maybeLength +=

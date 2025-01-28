@@ -18,19 +18,16 @@ import {
   AnnotationEditorParamsType,
   AnnotationEditorType,
   AnnotationMode,
-  CMapCompressionType,
   createValidAbsoluteUrl,
   FeatureTest,
   ImageKind,
   InvalidPDFException,
-  isNodeJS,
-  MissingPDFException,
   normalizeUnicode,
   OPS,
   PasswordResponses,
   PermissionFlag,
+  ResponseException,
   shadow,
-  UnexpectedResponseException,
   Util,
   VerbosityLevel,
 } from "../../src/shared/util.js";
@@ -42,7 +39,6 @@ import {
   version,
 } from "../../src/display/api.js";
 import {
-  DOMSVGFactory,
   fetchData,
   getFilenameFromUrl,
   getPdfFilenameFromUrl,
@@ -55,14 +51,17 @@ import {
   PixelsPerInch,
   RenderingCancelledException,
   setLayerDimensions,
+  stopEvent,
 } from "../../src/display/display_utils.js";
 import { AnnotationEditorLayer } from "../../src/display/editor/annotation_editor_layer.js";
 import { AnnotationEditorUIManager } from "../../src/display/editor/tools.js";
 import { AnnotationLayer } from "../../src/display/annotation_layer.js";
 import { ColorPicker } from "../../src/display/editor/color_picker.js";
+import { DOMSVGFactory } from "../../src/display/svg_factory.js";
 import { DrawLayer } from "../../src/display/draw_layer.js";
 import { GlobalWorkerOptions } from "../../src/display/worker_options.js";
 import { TextLayer } from "../../src/display/text_layer.js";
+import { TouchManager } from "../../src/display/touch_manager.js";
 import { XfaLayer } from "../../src/display/xfa_layer.js";
 
 const expectedAPI = Object.freeze({
@@ -74,7 +73,6 @@ const expectedAPI = Object.freeze({
   AnnotationLayer,
   AnnotationMode,
   build,
-  CMapCompressionType,
   ColorPicker,
   createValidAbsoluteUrl,
   DOMSVGFactory,
@@ -90,7 +88,6 @@ const expectedAPI = Object.freeze({
   InvalidPDFException,
   isDataScheme,
   isPdfFile,
-  MissingPDFException,
   noContextMenu,
   normalizeUnicode,
   OPS,
@@ -102,10 +99,12 @@ const expectedAPI = Object.freeze({
   PermissionFlag,
   PixelsPerInch,
   RenderingCancelledException,
+  ResponseException,
   setLayerDimensions,
   shadow,
+  stopEvent,
   TextLayer,
-  UnexpectedResponseException,
+  TouchManager,
   Util,
   VerbosityLevel,
   version,
@@ -129,13 +128,20 @@ describe("pdfjs_api", function () {
 
 describe("web_pdfjsLib", function () {
   it("checks that the viewer re-exports the expected API functionality", async function () {
-    if (isNodeJS) {
-      pending("loadScript is not supported in Node.js.");
-    }
-    const apiPath = "../../build/generic/build/pdf.mjs";
-    await import(apiPath);
+    // Load the API globally, as the viewer does.
+    // eslint-disable-next-line no-unsanitized/method
+    await import(
+      typeof PDFJSDev !== "undefined" && PDFJSDev.test("LIB")
+        ? "../../../generic-legacy/build/pdf.mjs"
+        : "../../build/generic/build/pdf.mjs"
+    );
 
-    const webPdfjsLib = await import("../../web/pdfjs.js");
+    // eslint-disable-next-line no-unsanitized/method
+    const webPdfjsLib = await import(
+      typeof PDFJSDev !== "undefined" && PDFJSDev.test("LIB")
+        ? "../../../../web/pdfjs.js"
+        : "../../web/pdfjs.js"
+    );
 
     expect(Object.keys(webPdfjsLib).sort()).toEqual(
       Object.keys(expectedAPI).sort()

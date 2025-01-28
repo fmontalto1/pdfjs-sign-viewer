@@ -20,7 +20,7 @@
 // eslint-disable-next-line max-len
 /** @typedef {import("./text_accessibility.js").TextAccessibilityManager} TextAccessibilityManager */
 
-import { normalizeUnicode, TextLayer } from "pdfjs-lib";
+import { normalizeUnicode, stopEvent, TextLayer } from "pdfjs-lib";
 import { removeNullCharacters } from "./ui_utils.js";
 
 /**
@@ -29,7 +29,14 @@ import { removeNullCharacters } from "./ui_utils.js";
  * @property {TextHighlighter} [highlighter] - Optional object that will handle
  *   highlighting text from the find controller.
  * @property {TextAccessibilityManager} [accessibilityManager]
+ * @property {boolean} [enablePermissions]
  * @property {function} [onAppend]
+ */
+
+/**
+ * @typedef {Object} TextLayerBuilderRenderOptions
+ * @property {PageViewport} viewport
+ * @property {Object} [textContentParams]
  */
 
 /**
@@ -50,6 +57,9 @@ class TextLayerBuilder {
 
   static #selectionChangeAbortController = null;
 
+  /**
+   * @param {TextLayerBuilderOptions} options
+   */
   constructor({
     pdfPage,
     highlighter = null,
@@ -70,10 +80,10 @@ class TextLayerBuilder {
 
   /**
    * Renders the text layer.
-   * @param {PageViewport} viewport
-   * @param {Object} [textContentParams]
+   * @param {TextLayerBuilderRenderOptions} options
+   * @returns {Promise<void>}
    */
-  async render(viewport, textContentParams = null) {
+  async render({ viewport, textContentParams = null }) {
     if (this.#renderingDone && this.#textLayer) {
       this.#textLayer.update({
         viewport,
@@ -162,8 +172,7 @@ class TextLayerBuilder {
           removeNullCharacters(normalizeUnicode(selection.toString()))
         );
       }
-      event.preventDefault();
-      event.stopPropagation();
+      stopEvent(event);
     });
 
     TextLayerBuilder.#textLayers.set(div, end);
@@ -299,7 +308,7 @@ class TextLayerBuilder {
           anchor = anchor.parentNode;
         }
 
-        const parentTextLayer = anchor.parentElement.closest(".textLayer");
+        const parentTextLayer = anchor.parentElement?.closest(".textLayer");
         const endDiv = this.#textLayers.get(parentTextLayer);
         if (endDiv) {
           endDiv.style.width = parentTextLayer.style.width;

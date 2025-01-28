@@ -485,19 +485,15 @@ class Catalog {
       if (!Array.isArray(groupsData)) {
         return shadow(this, "optionalContentConfig", null);
       }
-      const groups = [];
-      const groupRefs = new RefSet();
+      const groupRefCache = new RefSetCache();
       // Ensure all the optional content groups are valid.
       for (const groupRef of groupsData) {
-        if (!(groupRef instanceof Ref) || groupRefs.has(groupRef)) {
+        if (!(groupRef instanceof Ref) || groupRefCache.has(groupRef)) {
           continue;
         }
-        groupRefs.put(groupRef);
-
-        groups.push(this.#readOptionalContentGroup(groupRef));
+        groupRefCache.put(groupRef, this.#readOptionalContentGroup(groupRef));
       }
-      config = this.#readOptionalContentConfig(defaultConfig, groupRefs);
-      config.groups = groups;
+      config = this.#readOptionalContentConfig(defaultConfig, groupRefCache);
     } catch (ex) {
       if (ex instanceof MissingDataException) {
         throw ex;
@@ -517,6 +513,7 @@ class Catalog {
         print: null,
         view: null,
       },
+      rbGroups: [],
     };
 
     const name = group.get("Name");
@@ -565,15 +562,12 @@ class Catalog {
     return obj;
   }
 
-  #readOptionalContentConfig(config, contentGroupRefs) {
+  #readOptionalContentConfig(config, groupRefCache) {
     function parseOnOff(refs) {
       const onParsed = [];
       if (Array.isArray(refs)) {
         for (const value of refs) {
-          if (!(value instanceof Ref)) {
-            continue;
-          }
-          if (contentGroupRefs.has(value)) {
+          if (value instanceof Ref && groupRefCache.has(value)) {
             onParsed.push(value.toString());
           }
         }
@@ -588,7 +582,7 @@ class Catalog {
       const order = [];
 
       for (const value of refs) {
-        if (value instanceof Ref && contentGroupRefs.has(value)) {
+        if (value instanceof Ref && groupRefCache.has(value)) {
           parsedOrderRefs.put(value); // Handle "hidden" groups, see below.
 
           order.push(value.toString());
@@ -605,7 +599,7 @@ class Catalog {
         return order;
       }
       const hiddenGroups = [];
-      for (const groupRef of contentGroupRefs) {
+      for (const [groupRef] of groupRefCache.items()) {
         if (parsedOrderRefs.has(groupRef)) {
           continue;
         }
@@ -632,15 +626,43 @@ class Catalog {
         return null;
       }
       const nestedOrder = parseOrder(value.slice(1), nestedLevels);
-      if (!nestedOrder || !nestedOrder.length) {
+      if (!nestedOrder?.length) {
         return null;
       }
       return { name: stringToPDFString(nestedName), order: nestedOrder };
     }
 
+    function parseRBGroups(rbGroups) {
+      if (!Array.isArray(rbGroups)) {
+        return;
+      }
+
+      for (const value of rbGroups) {
+        const rbGroup = xref.fetchIfRef(value);
+        if (!Array.isArray(rbGroup) || !rbGroup.length) {
+          continue;
+        }
+        const parsedRbGroup = new Set();
+
+        for (const ref of rbGroup) {
+          if (
+            ref instanceof Ref &&
+            groupRefCache.has(ref) &&
+            !parsedRbGroup.has(ref.toString())
+          ) {
+            parsedRbGroup.add(ref.toString());
+            // Keep a record of which RB groups the current OCG belongs to.
+            groupRefCache.get(ref).rbGroups.push(parsedRbGroup);
+          }
+        }
+      }
+    }
+
     const xref = this.xref,
       parsedOrderRefs = new RefSet(),
       MAX_NESTED_LEVELS = 10;
+
+    parseRBGroups(config.get("RBGroups"));
 
     return {
       name:
@@ -658,7 +680,7 @@ class Catalog {
       on: parseOnOff(config.get("ON")),
       off: parseOnOff(config.get("OFF")),
       order: parseOrder(config.get("Order")),
-      groups: null,
+      groups: [...groupRefCache],
     };
   }
 
@@ -695,12 +717,12 @@ class Catalog {
         }
       }
     } else if (obj instanceof Dict) {
-      obj.forEach(function (key, value) {
+      for (const [key, value] of obj) {
         const dest = fetchDest(value);
         if (dest) {
           dests[key] = dest;
         }
-      });
+      }
     }
     return shadow(this, "destinations", dests);
   }
@@ -901,8 +923,7 @@ class Catalog {
     }
     let prefs = null;
 
-    for (const key of obj.getKeys()) {
-      const value = obj.get(key);
+    for (const [key, value] of obj) {
       let prefValue;
 
       switch (key) {

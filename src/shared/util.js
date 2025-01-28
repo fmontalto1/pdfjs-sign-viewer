@@ -28,8 +28,6 @@ const isNodeJS =
 const IDENTITY_MATRIX = [1, 0, 0, 1, 0, 0];
 const FONT_IDENTITY_MATRIX = [0.001, 0, 0, 0.001, 0, 0];
 
-const MAX_IMAGE_SIZE_TO_CACHE = 10e6; // Ten megabytes.
-
 // Represent the percentage of the height of a single-line field over
 // the font size. Acrobat seems to use this value.
 const LINE_FACTOR = 1.35;
@@ -94,6 +92,7 @@ const AnnotationEditorParamsType = {
   HIGHLIGHT_THICKNESS: 33,
   HIGHLIGHT_FREE: 34,
   HIGHLIGHT_SHOW_ALL: 35,
+  DRAW_STEP: 41,
 };
 
 // Permission flags from Table 22, Section 7.6.3.2 of the PDF specification.
@@ -240,11 +239,6 @@ const VerbosityLevel = {
   INFOS: 5,
 };
 
-const CMapCompressionType = {
-  NONE: 0,
-  BINARY: 1,
-};
-
 // All the possible operations for an operator list.
 const OPS = {
   // Intentionally start from 1 so it is easy to spot bad operators that will be
@@ -368,6 +362,7 @@ function getVerbosityLevel() {
 // end users.
 function info(msg) {
   if (verbosity >= VerbosityLevel.INFOS) {
+    // eslint-disable-next-line no-console
     console.log(`Info: ${msg}`);
   }
 }
@@ -375,6 +370,7 @@ function info(msg) {
 // Non-fatal warnings.
 function warn(msg) {
   if (verbosity >= VerbosityLevel.WARNINGS) {
+    // eslint-disable-next-line no-console
     console.log(`Warning: ${msg}`);
   }
 }
@@ -503,16 +499,11 @@ class InvalidPDFException extends BaseException {
   }
 }
 
-class MissingPDFException extends BaseException {
-  constructor(msg) {
-    super(msg, "MissingPDFException");
-  }
-}
-
-class UnexpectedResponseException extends BaseException {
-  constructor(msg, status) {
-    super(msg, "UnexpectedResponseException");
+class ResponseException extends BaseException {
+  constructor(msg, status, missing) {
+    super(msg, "ResponseException");
     this.status = status;
+    this.missing = missing;
   }
 }
 
@@ -625,6 +616,14 @@ class FeatureTest {
       this,
       "isOffscreenCanvasSupported",
       typeof OffscreenCanvas !== "undefined"
+    );
+  }
+
+  static get isImageDecoderSupported() {
+    return shadow(
+      this,
+      "isImageDecoderSupported",
+      typeof ImageDecoder !== "undefined"
     );
   }
 
@@ -1070,37 +1069,54 @@ function normalizeUnicode(str) {
 function getUuid() {
   if (
     (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) ||
-    (typeof crypto !== "undefined" && typeof crypto?.randomUUID === "function")
+    typeof crypto.randomUUID === "function"
   ) {
     return crypto.randomUUID();
   }
   const buf = new Uint8Array(32);
-  if (
-    typeof crypto !== "undefined" &&
-    typeof crypto?.getRandomValues === "function"
-  ) {
-    crypto.getRandomValues(buf);
-  } else {
-    for (let i = 0; i < 32; i++) {
-      buf[i] = Math.floor(Math.random() * 255);
-    }
-  }
+  crypto.getRandomValues(buf);
   return bytesToString(buf);
 }
 
 const AnnotationPrefix = "pdfjs_internal_id_";
 
-const FontRenderOps = {
-  BEZIER_CURVE_TO: 0,
-  MOVE_TO: 1,
-  LINE_TO: 2,
-  QUADRATIC_CURVE_TO: 3,
-  RESTORE: 4,
-  SAVE: 5,
-  SCALE: 6,
-  TRANSFORM: 7,
-  TRANSLATE: 8,
-};
+// TODO: Remove this once `Uint8Array.prototype.toHex` is generally available.
+function toHexUtil(arr) {
+  if (Uint8Array.prototype.toHex) {
+    return arr.toHex();
+  }
+  return Array.from(arr, num => hexNumbers[num]).join("");
+}
+
+// TODO: Remove this once `Uint8Array.prototype.toBase64` is generally
+//       available.
+function toBase64Util(arr) {
+  if (Uint8Array.prototype.toBase64) {
+    return arr.toBase64();
+  }
+  return btoa(bytesToString(arr));
+}
+
+// TODO: Remove this once `Uint8Array.fromBase64` is generally available.
+function fromBase64Util(str) {
+  if (Uint8Array.fromBase64) {
+    return Uint8Array.fromBase64(str);
+  }
+  return stringToBytes(atob(str));
+}
+
+// TODO: Remove this once https://bugzilla.mozilla.org/show_bug.cgi?id=1928493
+//       is fixed.
+if (
+  (typeof PDFJSDev === "undefined" || PDFJSDev.test("SKIP_BABEL")) &&
+  typeof Promise.try !== "function"
+) {
+  Promise.try = function (fn, ...args) {
+    return new Promise(resolve => {
+      resolve(fn(...args));
+    });
+  };
+}
 
 export {
   AbortException,
@@ -1119,16 +1135,16 @@ export {
   BaseException,
   BASELINE_FACTOR,
   bytesToString,
-  CMapCompressionType,
   createValidAbsoluteUrl,
   DocumentActionEventType,
   FeatureTest,
   FONT_IDENTITY_MATRIX,
-  FontRenderOps,
   FormatError,
+  fromBase64Util,
   getModificationDate,
   getUuid,
   getVerbosityLevel,
+  hexNumbers,
   IDENTITY_MATRIX,
   ImageKind,
   info,
@@ -1137,8 +1153,6 @@ export {
   isNodeJS,
   LINE_DESCENT_FACTOR,
   LINE_FACTOR,
-  MAX_IMAGE_SIZE_TO_CACHE,
-  MissingPDFException,
   normalizeUnicode,
   objectFromMap,
   objectSize,
@@ -1148,6 +1162,7 @@ export {
   PasswordResponses,
   PermissionFlag,
   RenderingIntentFlag,
+  ResponseException,
   setVerbosityLevel,
   shadow,
   string32,
@@ -1155,7 +1170,8 @@ export {
   stringToPDFString,
   stringToUTF8String,
   TextRenderingMode,
-  UnexpectedResponseException,
+  toBase64Util,
+  toHexUtil,
   UnknownErrorException,
   unreachable,
   utf8StringToString,

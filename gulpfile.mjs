@@ -12,7 +12,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/* eslint-env node */
 
 import {
   babelPluginPDFJSPreprocessor,
@@ -84,7 +83,7 @@ const ENV_TARGETS = [
   "Chrome >= 103",
   "Firefox ESR",
   "Safari >= 16.4",
-  "Node >= 18",
+  "Node >= 20",
   "> 1%",
   "not IE > 0",
   "not dead",
@@ -98,7 +97,7 @@ const AUTOPREFIXER_CONFIG = {
 const BABEL_TARGETS = ENV_TARGETS.join(", ");
 
 const BABEL_PRESET_ENV_OPTS = Object.freeze({
-  corejs: "3.38.1",
+  corejs: "3.40.0",
   exclude: ["web.structured-clone"],
   shippedProposals: true,
   useBuiltIns: "usage",
@@ -191,6 +190,9 @@ function createWebpackAlias(defines) {
     "fluent-dom": "node_modules/@fluent/dom/esm/index.js",
   };
   const libraryAlias = {
+    "display-cmap_reader_factory": "src/display/stubs.js",
+    "display-standard_fontdata_factory": "src/display/stubs.js",
+    "display-wasm_factory": "src/display/stubs.js",
     "display-fetch_stream": "src/display/stubs.js",
     "display-network": "src/display/stubs.js",
     "display-node_stream": "src/display/stubs.js",
@@ -219,6 +221,11 @@ function createWebpackAlias(defines) {
   };
 
   if (defines.CHROME) {
+    libraryAlias["display-cmap_reader_factory"] =
+      "src/display/cmap_reader_factory.js";
+    libraryAlias["display-standard_fontdata_factory"] =
+      "src/display/standard_fontdata_factory.js";
+    libraryAlias["display-wasm_factory"] = "src/display/wasm_factory.js";
     libraryAlias["display-fetch_stream"] = "src/display/fetch_stream.js";
     libraryAlias["display-network"] = "src/display/network.js";
 
@@ -231,6 +238,11 @@ function createWebpackAlias(defines) {
     // Aliases defined here must also be replicated in the paths section of
     // the tsconfig.json file for the type generation to work.
     // In the tsconfig.json files, the .js extension must be omitted.
+    libraryAlias["display-cmap_reader_factory"] =
+      "src/display/cmap_reader_factory.js";
+    libraryAlias["display-standard_fontdata_factory"] =
+      "src/display/standard_fontdata_factory.js";
+    libraryAlias["display-wasm_factory"] = "src/display/wasm_factory.js";
     libraryAlias["display-fetch_stream"] = "src/display/fetch_stream.js";
     libraryAlias["display-network"] = "src/display/network.js";
     libraryAlias["display-node_stream"] = "src/display/node_stream.js";
@@ -371,8 +383,14 @@ function createWebpackConfig(
     },
     devtool: enableSourceMaps ? "source-map" : undefined,
     module: {
+      parser: {
+        javascript: {
+          importMeta: false,
+        },
+      },
       rules: [
         {
+          test: /\.[mc]?js$/,
           loader: "babel-loader",
           exclude: babelExcludeRegExp,
           options: {
@@ -631,6 +649,15 @@ function createStandardFontBundle() {
   );
 }
 
+function createWasmBundle() {
+  return ordered([
+    gulp.src(["external/openjpeg/*.wasm"], {
+      base: "external/openjpeg",
+      encoding: false,
+    }),
+  ]);
+}
+
 function checkFile(filePath) {
   try {
     const stat = fs.lstatSync(filePath);
@@ -676,12 +703,9 @@ function runTests(testsName, { bot = false, xfaOnly = false } = {}) {
         if (!bot) {
           args.push("--reftest");
         } else {
-          const os = process.env.OS;
-          if (/windows/i.test(os)) {
-            // The browser-tests are too slow in Google Chrome on the Windows
-            // bot, causing a timeout, hence disabling them for now.
-            forceNoChrome = true;
-          }
+          // The browser-tests are too slow in Google Chrome on the bots,
+          // causing a timeout, hence disabling them for now.
+          forceNoChrome = true;
         }
         if (xfaOnly) {
           args.push("--xfaOnly");
@@ -760,12 +784,10 @@ function makeRef(done, bot) {
   let forceNoChrome = false;
   const args = ["test.mjs", "--masterMode"];
   if (bot) {
-    const os = process.env.OS;
-    if (/windows/i.test(os)) {
-      // The browser-tests are too slow in Google Chrome on the Windows
-      // bot, causing a timeout, hence disabling them for now.
-      forceNoChrome = true;
-    }
+    // The browser-tests are too slow in Google Chrome on the bots,
+    // causing a timeout, hence disabling them for now.
+    forceNoChrome = true;
+
     args.push("--noPrompts", "--strictVerify");
   }
   if (process.argv.includes("--noChrome") || forceNoChrome) {
@@ -1058,6 +1080,7 @@ function buildGeneric(defines, dir) {
       .pipe(gulp.dest(dir + "web")),
     createCMapBundle().pipe(gulp.dest(dir + "web/cmaps")),
     createStandardFontBundle().pipe(gulp.dest(dir + "web/standard_fonts")),
+    createWasmBundle().pipe(gulp.dest(dir + "web/wasm")),
 
     preprocessHTML("web/viewer.html", defines).pipe(gulp.dest(dir + "web")),
     preprocessCSS("web/viewer.css", defines)
@@ -1143,6 +1166,7 @@ function buildComponents(defines, dir) {
     "web/images/messageBar_*.svg",
     "web/images/toolbarButton-{editorHighlight,menuArrow}.svg",
     "web/images/cursor-*.svg",
+    "web/images/secondaryToolbarButton-documentProperties.svg",
   ];
 
   return ordered([
@@ -1387,6 +1411,7 @@ gulp.task(
         createStandardFontBundle().pipe(
           gulp.dest(MOZCENTRAL_CONTENT_DIR + "web/standard_fonts")
         ),
+        createWasmBundle().pipe(gulp.dest(MOZCENTRAL_CONTENT_DIR + "web/wasm")),
 
         preprocessHTML("web/viewer.html", defines).pipe(
           gulp.dest(MOZCENTRAL_CONTENT_DIR + "web")
@@ -1489,6 +1514,9 @@ gulp.task(
         createStandardFontBundle().pipe(
           gulp.dest(CHROME_BUILD_CONTENT_DIR + "web/standard_fonts")
         ),
+        createWasmBundle().pipe(
+          gulp.dest(CHROME_BUILD_CONTENT_DIR + "web/wasm")
+        ),
 
         preprocessHTML("web/viewer.html", defines).pipe(
           gulp.dest(CHROME_BUILD_CONTENT_DIR + "web")
@@ -1573,6 +1601,9 @@ function buildLibHelper(bundleDefines, inputStream, outputDir) {
     defines: bundleDefines,
     map: {
       "pdfjs-lib": "../pdf.js",
+      "display-cmap_reader_factory": "./cmap_reader_factory.js",
+      "display-standard_fontdata_factory": "./standard_fontdata_factory.js",
+      "display-wasm_factory": "./wasm_factory.js",
       "display-fetch_stream": "./fetch_stream.js",
       "display-network": "./network.js",
       "display-node_stream": "./node_stream.js",
@@ -1921,20 +1952,25 @@ function createBaseline(done) {
 
 gulp.task(
   "unittestcli",
-  gulp.series(setTestEnv, "lib-legacy", function runUnitTestCli(done) {
-    const options = [
-      "node_modules/jasmine/bin/jasmine",
-      "JASMINE_CONFIG_PATH=test/unit/clitests.json",
-    ];
-    const jasmineProcess = startNode(options, { stdio: "inherit" });
-    jasmineProcess.on("close", function (code) {
-      if (code !== 0) {
-        done(new Error("Unit tests failed."));
-        return;
-      }
-      done();
-    });
-  })
+  gulp.series(
+    setTestEnv,
+    "generic-legacy",
+    "lib-legacy",
+    function runUnitTestCli(done) {
+      const options = [
+        "node_modules/jasmine/bin/jasmine",
+        "JASMINE_CONFIG_PATH=test/unit/clitests.json",
+      ];
+      const jasmineProcess = startNode(options, { stdio: "inherit" });
+      jasmineProcess.on("close", function (code) {
+        if (code !== 0) {
+          done(new Error("Unit tests failed."));
+          return;
+        }
+        done();
+      });
+    }
+  )
 );
 
 gulp.task("lint", function (done) {
@@ -1944,8 +1980,6 @@ gulp.task("lint", function (done) {
   // Ensure that we lint the Firefox specific *.jsm files too.
   const esLintOptions = [
     "node_modules/eslint/bin/eslint",
-    "--ext",
-    ".js,.jsm,.mjs,.json",
     ".",
     "--report-unused-disable-directives",
   ];
@@ -1974,8 +2008,9 @@ gulp.task("lint", function (done) {
 
   const svgLintOptions = [
     "node_modules/svglint/bin/cli.js",
-    "web/**/*.svg",
+    "**/*.svg",
     "--ci",
+    "--no-summary",
   ];
 
   const esLintProcess = startNode(esLintOptions, { stdio: "inherit" });
@@ -2000,12 +2035,7 @@ gulp.task("lint", function (done) {
         }
 
         const svgLintProcess = startNode(svgLintOptions, {
-          stdio: "pipe",
-        });
-        svgLintProcess.stdout.setEncoding("utf8");
-        svgLintProcess.stdout.on("data", m => {
-          m = m.toString().replace(/-+ Summary -+.*/ms, "");
-          console.log(m);
+          stdio: "inherit",
         });
         svgLintProcess.on("close", function (svgLintCode) {
           if (svgLintCode !== 0) {
@@ -2054,6 +2084,15 @@ gulp.task(
   )
 );
 
+gulp.task("dev-wasm", function () {
+  const VIEWER_WASM_OUTPUT = "web/wasm/";
+
+  fs.rmSync(VIEWER_WASM_OUTPUT, { recursive: true, force: true });
+  fs.mkdirSync(VIEWER_WASM_OUTPUT, { recursive: true });
+
+  return createWasmBundle().pipe(gulp.dest(VIEWER_WASM_OUTPUT));
+});
+
 gulp.task(
   "dev-sandbox",
   gulp.series(
@@ -2087,6 +2126,13 @@ gulp.task(
         "l10n/**/*.ftl",
         { ignoreInitial: false },
         gulp.series("locale")
+      );
+    },
+    function watchWasm() {
+      gulp.watch(
+        "external/openjpeg/*",
+        { ignoreInitial: false },
+        gulp.series("dev-wasm")
       );
     },
     function watchDevSandbox() {
@@ -2244,8 +2290,7 @@ function packageJson() {
     bugs: DIST_BUGS_URL,
     license: DIST_LICENSE,
     optionalDependencies: {
-      canvas: "^2.11.2",
-      path2d: "^0.2.1",
+      "@napi-rs/canvas": "^0.1.65",
     },
     browser: {
       canvas: false,
@@ -2259,7 +2304,7 @@ function packageJson() {
       url: `git+${DIST_GIT_URL}`,
     },
     engines: {
-      node: ">=18",
+      node: ">=20",
     },
     scripts: {},
   };

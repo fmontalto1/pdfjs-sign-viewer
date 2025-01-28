@@ -20,23 +20,29 @@ import {
   ImageKind,
   InvalidPDFException,
   isNodeJS,
-  MissingPDFException,
   objectSize,
   OPS,
   PasswordException,
   PasswordResponses,
   PermissionFlag,
+  ResponseException,
   UnknownErrorException,
 } from "../../src/shared/util.js";
 import {
   buildGetDocumentParams,
   CMAP_URL,
-  createTemporaryNodeServer,
   DefaultFileReaderFactory,
+  getCrossOriginHostname,
   TEST_PDFS_PATH,
+  TestPdfsServer,
 } from "./test_utils.js";
 import {
-  DefaultCanvasFactory,
+  fetchData as fetchDataDOM,
+  PageViewport,
+  RenderingCancelledException,
+  StatTimer,
+} from "../../src/display/display_utils.js";
+import {
   getDocument,
   PDFDataRangeTransport,
   PDFDocumentLoadingTask,
@@ -45,11 +51,6 @@ import {
   PDFWorker,
   RenderTask,
 } from "../../src/display/api.js";
-import {
-  PageViewport,
-  RenderingCancelledException,
-  StatTimer,
-} from "../../src/display/display_utils.js";
 import { AutoPrintRegExp } from "../../web/ui_utils.js";
 import { GlobalImageCache } from "../../src/core/image_utils.js";
 import { GlobalWorkerOptions } from "../../src/display/worker_options.js";
@@ -65,28 +66,12 @@ describe("api", function () {
   const tracemonkeyGetDocumentParams =
     buildGetDocumentParams(tracemonkeyFileName);
 
-  let CanvasFactory;
-  let tempServer = null;
-
-  beforeAll(function () {
-    CanvasFactory = new DefaultCanvasFactory({});
-
-    if (isNodeJS) {
-      tempServer = createTemporaryNodeServer();
-    }
+  beforeAll(async function () {
+    await TestPdfsServer.ensureStarted();
   });
 
-  afterAll(function () {
-    CanvasFactory = null;
-
-    if (isNodeJS) {
-      // Close the server from accepting new connections after all test
-      // finishes.
-      const { server } = tempServer;
-      server.close();
-
-      tempServer = null;
-    }
+  afterAll(async function () {
+    await TestPdfsServer.ensureStopped();
   });
 
   function waitSome(callback) {
@@ -117,6 +102,21 @@ describe("api", function () {
     return node;
   }
 
+  async function getImageBlob(filename) {
+    if (isNodeJS) {
+      throw new Error("Not implemented.");
+    }
+    const TEST_IMAGES_PATH = "../images/";
+    const url = new URL(TEST_IMAGES_PATH + filename, window.location).href;
+
+    return fetchDataDOM(url, /* type = */ "blob");
+  }
+
+  async function getImageBitmap(filename) {
+    const blob = await getImageBlob(filename);
+    return createImageBitmap(blob);
+  }
+
   describe("getDocument", function () {
     it("creates pdf doc from URL-string", async function () {
       const urlStr = TEST_PDFS_PATH + basicApiFileName;
@@ -132,9 +132,7 @@ describe("api", function () {
     });
 
     it("creates pdf doc from URL-object", async function () {
-      const urlObj = isNodeJS
-        ? new URL(`http://127.0.0.1:${tempServer.port}/${basicApiFileName}`)
-        : new URL(TEST_PDFS_PATH + basicApiFileName, window.location);
+      const urlObj = TestPdfsServer.resolveURL(basicApiFileName);
 
       const loadingTask = getDocument(urlObj);
       expect(loadingTask instanceof PDFDocumentLoadingTask).toEqual(true);
@@ -292,7 +290,9 @@ describe("api", function () {
         // Shouldn't get here.
         expect(false).toEqual(true);
       } catch (reason) {
-        expect(reason instanceof MissingPDFException).toEqual(true);
+        expect(reason instanceof ResponseException).toEqual(true);
+        expect(reason.status).toEqual(isNodeJS ? 0 : 404);
+        expect(reason.missing).toEqual(true);
       }
 
       await loadingTask.destroy();
@@ -623,7 +623,7 @@ describe("api", function () {
         expect(false).toEqual(true);
       } catch (reason) {
         expect(reason instanceof InvalidPDFException).toEqual(true);
-        expect(reason.message).toEqual("Invalid PDF structure.");
+        expect(reason.message).toEqual("Invalid Root reference.");
       }
 
       await loadingTask.destroy();
@@ -1708,6 +1708,20 @@ describe("api", function () {
       await loadingTask.destroy();
     });
 
+    it("gets fieldObjects and skipping LinkAnnotations", async function () {
+      if (isNodeJS) {
+        pending("Linked test-cases are not supported in Node.js.");
+      }
+
+      const loadingTask = getDocument(buildGetDocumentParams("issue19281.pdf"));
+      const pdfDoc = await loadingTask.promise;
+      const fieldObjects = await pdfDoc.getFieldObjects();
+
+      expect(fieldObjects).toEqual(null);
+
+      await loadingTask.destroy();
+    });
+
     it("gets non-existent calculationOrder", async function () {
       const calculationOrder = await pdfDocument.getCalculationOrderIds();
       expect(calculationOrder).toEqual(null);
@@ -2422,19 +2436,19 @@ describe("api", function () {
       const manifesto = `
       The Mozilla Manifesto Addendum
       Pledge for a Healthy Internet
-      
+
       The open, global internet is the most powerful communication and collaboration resource we have ever seen.
       It embodies some of our deepest hopes for human progress.
       It enables new opportunities for learning, building a sense of shared humanity, and solving the pressing problems
       facing people everywhere.
-      
+
       Over the last decade we have seen this promise fulfilled in many ways.
       We have also seen the power of the internet used to magnify divisiveness,
       incite violence, promote hatred, and intentionally manipulate fact and reality.
       We have learned that we should more explicitly set out our aspirations for the human experience of the internet.
       We do so now.
       `.repeat(100);
-      expect(manifesto.length).toEqual(80500);
+      expect(manifesto.length).toEqual(79300);
 
       let loadingTask = getDocument(buildGetDocumentParams("empty.pdf"));
       let pdfDoc = await loadingTask.promise;
@@ -2472,14 +2486,7 @@ describe("api", function () {
       if (isNodeJS) {
         pending("Cannot create a bitmap from Node.js.");
       }
-
-      const TEST_IMAGES_PATH = "../images/";
-      const filename = "firefox_logo.png";
-      const path = new URL(TEST_IMAGES_PATH + filename, window.location).href;
-
-      const response = await fetch(path);
-      const blob = await response.blob();
-      const bitmap = await createImageBitmap(blob);
+      const bitmap = await getImageBitmap("firefox_logo.png");
 
       let loadingTask = getDocument(buildGetDocumentParams("empty.pdf"));
       let pdfDoc = await loadingTask.promise;
@@ -2524,14 +2531,7 @@ describe("api", function () {
       if (isNodeJS) {
         pending("Cannot create a bitmap from Node.js.");
       }
-
-      const TEST_IMAGES_PATH = "../images/";
-      const filename = "firefox_logo.png";
-      const path = new URL(TEST_IMAGES_PATH + filename, window.location).href;
-
-      const response = await fetch(path);
-      const blob = await response.blob();
-      const bitmap = await createImageBitmap(blob);
+      const bitmap = await getImageBitmap("firefox_logo.png");
 
       let loadingTask = getDocument(buildGetDocumentParams("bug1823296.pdf"));
       let pdfDoc = await loadingTask.promise;
@@ -2636,14 +2636,7 @@ describe("api", function () {
       if (isNodeJS) {
         pending("Cannot create a bitmap from Node.js.");
       }
-
-      const TEST_IMAGES_PATH = "../images/";
-      const filename = "firefox_logo.png";
-      const path = new URL(TEST_IMAGES_PATH + filename, window.location).href;
-
-      const response = await fetch(path);
-      const blob = await response.blob();
-      const bitmap = await createImageBitmap(blob);
+      const bitmap = await getImageBitmap("firefox_logo.png");
 
       let loadingTask = getDocument(
         buildGetDocumentParams("pdfjs_wikipedia.pdf")
@@ -2734,13 +2727,8 @@ describe("api", function () {
       if (isNodeJS) {
         pending("Cannot create a bitmap from Node.js.");
       }
+      const blob = await getImageBlob("firefox_logo.png");
 
-      const TEST_IMAGES_PATH = "../images/";
-      const filename = "firefox_logo.png";
-      const path = new URL(TEST_IMAGES_PATH + filename, window.location).href;
-
-      const response = await fetch(path);
-      const blob = await response.blob();
       let loadingTask, pdfDoc;
       let data = buildGetDocumentParams("empty.pdf");
 
@@ -2804,14 +2792,7 @@ describe("api", function () {
       if (isNodeJS) {
         pending("Cannot create a bitmap from Node.js.");
       }
-
-      const TEST_IMAGES_PATH = "../images/";
-      const filename = "firefox_logo.png";
-      const path = new URL(TEST_IMAGES_PATH + filename, window.location).href;
-
-      const response = await fetch(path);
-      const blob = await response.blob();
-      const bitmap = await createImageBitmap(blob);
+      const bitmap = await getImageBitmap("firefox_logo.png");
 
       let loadingTask = getDocument(buildGetDocumentParams("empty.pdf"));
       let pdfDoc = await loadingTask.promise;
@@ -2860,14 +2841,7 @@ describe("api", function () {
       if (isNodeJS) {
         pending("Cannot create a bitmap from Node.js.");
       }
-
-      const TEST_IMAGES_PATH = "../images/";
-      const filename = "firefox_logo.png";
-      const path = new URL(TEST_IMAGES_PATH + filename, window.location).href;
-
-      const response = await fetch(path);
-      const blob = await response.blob();
-      const bitmap = await createImageBitmap(blob);
+      const bitmap = await getImageBitmap("firefox_logo.png");
 
       let loadingTask = getDocument(buildGetDocumentParams("empty.pdf"));
       let pdfDoc = await loadingTask.promise;
@@ -3013,17 +2987,14 @@ describe("api", function () {
       let loadingTask;
       function _checkCanLoad(expectSuccess, filename, options) {
         if (isNodeJS) {
+          // We can simulate cross-origin requests, but since Node.js does not
+          // enforce the Same Origin Policy, requests are expected to be allowed
+          // independently of withCredentials.
           pending("Cannot simulate cross-origin requests in Node.js");
         }
         const params = buildGetDocumentParams(filename, options);
         const url = new URL(params.url);
-        if (url.hostname === "localhost") {
-          url.hostname = "127.0.0.1";
-        } else if (params.url.hostname === "127.0.0.1") {
-          url.hostname = "localhost";
-        } else {
-          pending("Can only run cross-origin test on localhost!");
-        }
+        url.hostname = getCrossOriginHostname(url.hostname);
         params.url = url.href;
         loadingTask = getDocument(params);
         return loadingTask.promise
@@ -3119,8 +3090,19 @@ describe("api", function () {
       expect(page.ref).toEqual({ num: 15, gen: 0 });
     });
 
-    it("gets userUnit", function () {
+    it("gets default userUnit", function () {
       expect(page.userUnit).toEqual(1.0);
+    });
+
+    it("gets non-default userUnit", async function () {
+      const loadingTask = getDocument(buildGetDocumentParams("issue19176.pdf"));
+
+      const pdfDoc = await loadingTask.promise;
+      const pdfPage = await pdfDoc.getPage(1);
+
+      expect(pdfPage.userUnit).toEqual(72);
+
+      await loadingTask.destroy();
     });
 
     it("gets view", function () {
@@ -3154,11 +3136,32 @@ describe("api", function () {
       expect(viewport instanceof PageViewport).toEqual(true);
 
       expect(viewport.viewBox).toEqual(page.view);
+      expect(viewport.userUnit).toEqual(page.userUnit);
       expect(viewport.scale).toEqual(1.5);
       expect(viewport.rotation).toEqual(90);
       expect(viewport.transform).toEqual([0, 1.5, 1.5, 0, 0, 0]);
       expect(viewport.width).toEqual(1262.835);
       expect(viewport.height).toEqual(892.92);
+    });
+
+    it("gets viewport with non-default userUnit", async function () {
+      const loadingTask = getDocument(buildGetDocumentParams("issue19176.pdf"));
+
+      const pdfDoc = await loadingTask.promise;
+      const pdfPage = await pdfDoc.getPage(1);
+
+      const viewport = pdfPage.getViewport({ scale: 1 });
+      expect(viewport instanceof PageViewport).toEqual(true);
+
+      expect(viewport.viewBox).toEqual(pdfPage.view);
+      expect(viewport.userUnit).toEqual(pdfPage.userUnit);
+      expect(viewport.scale).toEqual(1);
+      expect(viewport.rotation).toEqual(0);
+      expect(viewport.transform).toEqual([72, 0, 0, -72, 0, 792]);
+      expect(viewport.width).toEqual(612);
+      expect(viewport.height).toEqual(792);
+
+      await loadingTask.destroy();
     });
 
     it('gets viewport with "offsetX/offsetY" arguments', function () {
@@ -4270,7 +4273,8 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
       const viewport = pdfPage.getViewport({ scale: 1 });
       expect(viewport instanceof PageViewport).toEqual(true);
 
-      const canvasAndCtx = CanvasFactory.create(
+      const { canvasFactory } = pdfDoc;
+      const canvasAndCtx = canvasFactory.create(
         viewport.width,
         viewport.height
       );
@@ -4297,7 +4301,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
       expect(statEntryThree.name).toEqual("Overall");
       expect(statEntryThree.end - statEntryThree.start).toBeGreaterThan(0);
 
-      CanvasFactory.destroy(canvasAndCtx);
+      canvasFactory.destroy(canvasAndCtx);
       await loadingTask.destroy();
     });
 
@@ -4305,7 +4309,8 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
       const viewport = page.getViewport({ scale: 1 });
       expect(viewport instanceof PageViewport).toEqual(true);
 
-      const canvasAndCtx = CanvasFactory.create(
+      const { canvasFactory } = pdfDocument;
+      const canvasAndCtx = canvasFactory.create(
         viewport.width,
         viewport.height
       );
@@ -4328,14 +4333,15 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
         expect(reason.extraDelay).toEqual(0);
       }
 
-      CanvasFactory.destroy(canvasAndCtx);
+      canvasFactory.destroy(canvasAndCtx);
     });
 
     it("re-render page, using the same canvas, after cancelling rendering", async function () {
       const viewport = page.getViewport({ scale: 1 });
       expect(viewport instanceof PageViewport).toEqual(true);
 
-      const canvasAndCtx = CanvasFactory.create(
+      const { canvasFactory } = pdfDocument;
+      const canvasAndCtx = canvasFactory.create(
         viewport.width,
         viewport.height
       );
@@ -4365,7 +4371,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
       await reRenderTask.promise;
       expect(reRenderTask.separateAnnots).toEqual(false);
 
-      CanvasFactory.destroy(canvasAndCtx);
+      canvasFactory.destroy(canvasAndCtx);
     });
 
     it("multiple render() on the same canvas", async function () {
@@ -4375,7 +4381,8 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
       const viewport = page.getViewport({ scale: 1 });
       expect(viewport instanceof PageViewport).toEqual(true);
 
-      const canvasAndCtx = CanvasFactory.create(
+      const { canvasFactory } = pdfDocument;
+      const canvasAndCtx = canvasFactory.create(
         viewport.width,
         viewport.height
       );
@@ -4406,6 +4413,8 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
           }
         ),
       ]);
+
+      canvasFactory.destroy(canvasAndCtx);
     });
 
     it("cleans up document resources after rendering of page", async function () {
@@ -4416,7 +4425,8 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
       const viewport = pdfPage.getViewport({ scale: 1 });
       expect(viewport instanceof PageViewport).toEqual(true);
 
-      const canvasAndCtx = CanvasFactory.create(
+      const { canvasFactory } = pdfDoc;
+      const canvasAndCtx = canvasFactory.create(
         viewport.width,
         viewport.height
       );
@@ -4432,7 +4442,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
       await pdfDoc.cleanup();
       expect(true).toEqual(true);
 
-      CanvasFactory.destroy(canvasAndCtx);
+      canvasFactory.destroy(canvasAndCtx);
       await loadingTask.destroy();
     });
 
@@ -4444,7 +4454,8 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
       const viewport = pdfPage.getViewport({ scale: 1 });
       expect(viewport instanceof PageViewport).toEqual(true);
 
-      const canvasAndCtx = CanvasFactory.create(
+      const { canvasFactory } = pdfDoc;
+      const canvasAndCtx = canvasFactory.create(
         viewport.width,
         viewport.height
       );
@@ -4479,7 +4490,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
       const { data } = canvasAndCtx.context.getImageData(0, 0, 1, 1);
       expect(data).toEqual(new Uint8ClampedArray([255, 0, 0, 255]));
 
-      CanvasFactory.destroy(canvasAndCtx);
+      canvasFactory.destroy(canvasAndCtx);
       await loadingTask.destroy();
     });
 
@@ -4495,6 +4506,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
         })
       );
       const pdfDoc = await loadingTask.promise;
+      const { canvasFactory } = pdfDoc;
       let checkedCopyLocalImage = false,
         firstImgData = null,
         firstStatsOverall = null;
@@ -4503,7 +4515,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
         const pdfPage = await pdfDoc.getPage(i);
         const viewport = pdfPage.getViewport({ scale: 1 });
 
-        const canvasAndCtx = CanvasFactory.create(
+        const canvasAndCtx = canvasFactory.create(
           viewport.width,
           viewport.height
         );
@@ -4516,7 +4528,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
         const opList = renderTask.getOperatorList();
         // The canvas is no longer necessary, since we only care about
         // the image-data below.
-        CanvasFactory.destroy(canvasAndCtx);
+        canvasFactory.destroy(canvasAndCtx);
 
         const [statsOverall] = pdfPage.stats.times
           .filter(time => time.name === "Overall")
@@ -4599,6 +4611,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
         })
       );
       const pdfDoc = await loadingTask.promise;
+      const { canvasFactory } = pdfDoc;
       let checkedCopyLocalImage = false,
         firstStatsOverall = null;
 
@@ -4606,7 +4619,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
         const pdfPage = await pdfDoc.getPage(i);
         const viewport = pdfPage.getViewport({ scale: 1 });
 
-        const canvasAndCtx = CanvasFactory.create(
+        const canvasAndCtx = canvasFactory.create(
           viewport.width,
           viewport.height
         );
@@ -4618,7 +4631,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
         await renderTask.promise;
         // The canvas is no longer necessary, since we only care about
         // the stats below.
-        CanvasFactory.destroy(canvasAndCtx);
+        canvasFactory.destroy(canvasAndCtx);
 
         const [statsOverall] = pdfPage.stats.times
           .filter(time => time.name === "Overall")
@@ -4646,13 +4659,14 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
 
       const loadingTask = getDocument(buildGetDocumentParams("issue18042.pdf"));
       const pdfDoc = await loadingTask.promise;
+      const { canvasFactory } = pdfDoc;
       let checkedGlobalDecodeFailed = false;
 
       for (let i = 1; i <= pdfDoc.numPages; i++) {
         const pdfPage = await pdfDoc.getPage(i);
         const viewport = pdfPage.getViewport({ scale: 1 });
 
-        const canvasAndCtx = CanvasFactory.create(
+        const canvasAndCtx = canvasFactory.create(
           viewport.width,
           viewport.height
         );
@@ -4665,7 +4679,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
         const opList = renderTask.getOperatorList();
         // The canvas is no longer necessary, since we only care about
         // the image-data below.
-        CanvasFactory.destroy(canvasAndCtx);
+        canvasFactory.destroy(canvasAndCtx);
 
         const { commonObjs, objs } = pdfPage;
         const imgIndex = opList.fnArray.indexOf(OPS.paintImageXObject);
@@ -4702,7 +4716,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
 
     it("render for printing, with `printAnnotationStorage` set", async function () {
       async function getPrintData(printAnnotationStorage = null) {
-        const canvasAndCtx = CanvasFactory.create(
+        const canvasAndCtx = canvasFactory.create(
           viewport.width,
           viewport.height
         );
@@ -4718,7 +4732,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
         expect(renderTask.separateAnnots).toEqual(false);
 
         const printData = canvasAndCtx.canvas.toDataURL();
-        CanvasFactory.destroy(canvasAndCtx);
+        canvasFactory.destroy(canvasAndCtx);
 
         return printData;
       }
@@ -4727,6 +4741,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
         buildGetDocumentParams("annotation-tx.pdf")
       );
       const pdfDoc = await loadingTask.promise;
+      const { canvasFactory } = pdfDoc;
       const pdfPage = await pdfDoc.getPage(1);
       const viewport = pdfPage.getViewport({ scale: 1 });
 
@@ -4787,7 +4802,8 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
       const viewport = page.getViewport({ scale: 1.2 });
       expect(viewport instanceof PageViewport).toEqual(true);
 
-      const canvasAndCtx = CanvasFactory.create(
+      const { canvasFactory } = pdf;
+      const canvasAndCtx = canvasFactory.create(
         viewport.width,
         viewport.height
       );
@@ -4799,7 +4815,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
       expect(renderTask.separateAnnots).toEqual(false);
 
       const data = canvasAndCtx.canvas.toDataURL();
-      CanvasFactory.destroy(canvasAndCtx);
+      canvasFactory.destroy(canvasAndCtx);
       return data;
     }
 

@@ -223,6 +223,12 @@ function getViewerConfiguration() {
       editorHighlightShowAll: document.getElementById("editorHighlightShowAll"),
     },
     printContainer: document.getElementById("printContainer"),
+    editorUndoBar: {
+      container: document.getElementById("editorUndoBar"),
+      message: document.getElementById("editorUndoBarMessage"),
+      undoButton: document.getElementById("editorUndoBarUndoButton"),
+      closeButton: document.getElementById("editorUndoBarCloseButton"),
+    },
   };
 }
 
@@ -248,7 +254,7 @@ function webViewerLoad() {
     } catch (ex) {
       // The viewer could be in e.g. a cross-origin <iframe> element,
       // fallback to dispatching the event at the current `document`.
-      console.error(`webviewerloaded: ${ex}`);
+      console.error("webviewerloaded:", ex);
       document.dispatchEvent(event);
     }
   }
