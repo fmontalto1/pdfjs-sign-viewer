@@ -23,7 +23,7 @@
 class L10n {
   #dir;
 
-  #elements = new Set();
+  #elements;
 
   #lang;
 
@@ -66,12 +66,12 @@ class L10n {
         args,
       },
     ]);
-    return messages?.[0].value || fallback;
+    return messages[0]?.value || fallback;
   }
 
   /** @inheritdoc */
   async translate(element) {
-    this.#elements.add(element);
+    (this.#elements ||= new Set()).add(element);
     try {
       this.#l10n.connectRoot(element);
       await this.#l10n.translateRoots();
@@ -81,11 +81,23 @@ class L10n {
   }
 
   /** @inheritdoc */
-  async destroy() {
-    for (const element of this.#elements) {
-      this.#l10n.disconnectRoot(element);
+  async translateOnce(element) {
+    try {
+      await this.#l10n.translateElements([element]);
+    } catch (ex) {
+      console.error("translateOnce:", ex);
     }
-    this.#elements.clear();
+  }
+
+  /** @inheritdoc */
+  async destroy() {
+    if (this.#elements) {
+      for (const element of this.#elements) {
+        this.#l10n.disconnectRoot(element);
+      }
+      this.#elements.clear();
+      this.#elements = null;
+    }
     this.#l10n.pauseObserving();
   }
 

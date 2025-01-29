@@ -19,7 +19,7 @@ import {
   copy,
   copyToClipboard,
   createPromise,
-  dragAndDropAnnotation,
+  dragAndDrop,
   firstPageOnTop,
   getEditors,
   getEditorSelector,
@@ -28,6 +28,7 @@ import {
   getSelectedEditors,
   getSerialized,
   hover,
+  isCanvasWhite,
   kbBigMoveDown,
   kbBigMoveLeft,
   kbBigMoveRight,
@@ -46,6 +47,7 @@ import {
   switchToEditor,
   waitForAnnotationEditorLayer,
   waitForAnnotationModeChanged,
+  waitForEditorMovedInDOM,
   waitForSelectedEditor,
   waitForSerialized,
   waitForStorageEntries,
@@ -86,6 +88,17 @@ const waitForPositionChange = (page, selector, xy) =>
     selector,
     xy
   );
+
+const moveEditor = async (page, selector, n, pressKey) => {
+  let xy = await getXY(page, selector);
+  for (let i = 0; i < n; i++) {
+    const handle = await waitForEditorMovedInDOM(page);
+    await pressKey();
+    await awaitPromise(handle);
+    await waitForPositionChange(page, selector, xy);
+    xy = await getXY(page, selector);
+  }
+};
 
 const cancelFocusIn = async (page, selector) => {
   page.evaluate(sel => {
@@ -953,19 +966,14 @@ describe("FreeText Editor", () => {
           const serialized = await getSerialized(page);
           expect(serialized).withContext(`In ${browserName}`).toEqual([]);
 
-          const editorRect = await getRect(page, getEditorSelector(0));
+          const editorSelector = getEditorSelector(0);
+          const editorRect = await getRect(page, editorSelector);
 
           // Select the annotation we want to move.
           await page.mouse.click(editorRect.x + 2, editorRect.y + 2);
-          await waitForSelectedEditor(page, getEditorSelector(0));
+          await waitForSelectedEditor(page, editorSelector);
 
-          await dragAndDropAnnotation(
-            page,
-            editorRect.x + editorRect.width / 2,
-            editorRect.y + editorRect.height / 2,
-            100,
-            100
-          );
+          await dragAndDrop(page, editorSelector, [[100, 100]]);
           await waitForSerialized(page, 1);
         })
       );
@@ -988,27 +996,8 @@ describe("FreeText Editor", () => {
         pages.map(async ([browserName, page]) => {
           await switchToFreeText(page);
 
-          const isEditorWhite = editorRect =>
-            page.evaluate(rect => {
-              const canvas = document.querySelector(".canvasWrapper canvas");
-              const ctx = canvas.getContext("2d");
-              rect ||= {
-                x: 0,
-                y: 0,
-                width: canvas.width,
-                height: canvas.height,
-              };
-              const { data } = ctx.getImageData(
-                rect.x,
-                rect.y,
-                rect.width,
-                rect.height
-              );
-              return data.every(x => x === 0xff);
-            }, editorRect);
-
           // The page has been re-rendered but with no freetext annotations.
-          let isWhite = await isEditorWhite();
+          let isWhite = await isCanvasWhite(page, 1);
           expect(isWhite).withContext(`In ${browserName}`).toBeTrue();
 
           let editorIds = await getEditors(page, "freeText");
@@ -1066,7 +1055,7 @@ describe("FreeText Editor", () => {
           editorIds = await getEditors(page, "freeText");
           expect(editorIds.length).withContext(`In ${browserName}`).toEqual(1);
 
-          isWhite = await isEditorWhite(editorRect);
+          isWhite = await isCanvasWhite(page, 1, editorRect);
           expect(isWhite).withContext(`In ${browserName}`).toBeTrue();
 
           // Check we've now a div containing the text.
@@ -1237,6 +1226,7 @@ describe("FreeText Editor", () => {
               pageIndex: 0,
               id: "51R",
               deleted: true,
+              popupRef: "",
             },
           ]);
 
@@ -1675,7 +1665,7 @@ describe("FreeText Editor", () => {
               clip: rect,
               type: "png",
             });
-            const editorImage = PNG.sync.read(editorPng);
+            const editorImage = PNG.sync.read(Buffer.from(editorPng));
             const editorFirstPix = getFirstPixel(
               editorImage.data,
               editorImage.width,
@@ -1703,7 +1693,7 @@ describe("FreeText Editor", () => {
               clip: rect,
               type: "png",
             });
-            const editorImage = PNG.sync.read(editorPng);
+            const editorImage = PNG.sync.read(Buffer.from(editorPng));
             const editorFirstPix = getFirstPixel(
               editorImage.data,
               editorImage.width,
@@ -1836,7 +1826,7 @@ describe("FreeText Editor", () => {
               clip: rect,
               type: "png",
             });
-            const editorImage = PNG.sync.read(editorPng);
+            const editorImage = PNG.sync.read(Buffer.from(editorPng));
             const editorFirstPix = getFirstPixel(
               editorImage.data,
               editorImage.width,
@@ -1870,7 +1860,7 @@ describe("FreeText Editor", () => {
               clip: rect,
               type: "png",
             });
-            const editorImage = PNG.sync.read(editorPng);
+            const editorImage = PNG.sync.read(Buffer.from(editorPng));
             const editorFirstPix = getFirstPixel(
               editorImage.data,
               editorImage.width,
@@ -1985,12 +1975,9 @@ describe("FreeText Editor", () => {
 
           const [pageX, pageY] = await getFirstSerialized(page, x => x.rect);
 
-          let xy = await getXY(page, selectorEditor);
-          for (let i = 0; i < 20; i++) {
-            await page.keyboard.press("ArrowRight");
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 20, () =>
+            page.keyboard.press("ArrowRight")
+          );
 
           let [newX, newY] = await getFirstSerialized(page, x => x.rect);
           expect(Math.round(newX))
@@ -2000,11 +1987,9 @@ describe("FreeText Editor", () => {
             .withContext(`In ${browserName}`)
             .toEqual(Math.round(pageY));
 
-          for (let i = 0; i < 20; i++) {
-            await page.keyboard.press("ArrowDown");
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 20, () =>
+            page.keyboard.press("ArrowDown")
+          );
 
           [newX, newY] = await getFirstSerialized(page, x => x.rect);
           expect(Math.round(newX))
@@ -2014,11 +1999,7 @@ describe("FreeText Editor", () => {
             .withContext(`In ${browserName}`)
             .toEqual(Math.round(pageY - 20));
 
-          for (let i = 0; i < 2; i++) {
-            await kbBigMoveLeft(page);
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 2, () => kbBigMoveLeft(page));
 
           [newX, newY] = await getFirstSerialized(page, x => x.rect);
           expect(Math.round(newX))
@@ -2028,11 +2009,7 @@ describe("FreeText Editor", () => {
             .withContext(`In ${browserName}`)
             .toEqual(Math.round(pageY - 20));
 
-          for (let i = 0; i < 2; i++) {
-            await kbBigMoveUp(page);
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 2, () => kbBigMoveUp(page));
 
           [newX, newY] = await getFirstSerialized(page, x => x.rect);
           expect(Math.round(newX))
@@ -2058,12 +2035,9 @@ describe("FreeText Editor", () => {
           const pageWidth = page2X - page1X;
 
           const selectorEditor = getEditorSelector(0);
-          let xy = await getXY(page, selectorEditor);
-          for (let i = 0; i < 5; i++) {
-            await page.keyboard.press("ArrowRight");
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 5, () =>
+            page.keyboard.press("ArrowRight")
+          );
 
           const [new1X, , new2X] = await getFirstSerialized(page, x => x.rect);
           const newWidth = new2X - new1X;
@@ -2110,42 +2084,21 @@ describe("FreeText Editor", () => {
             visible: true,
           });
 
-          let xy = await getXY(page, selectorEditor);
-          for (let i = 0; i < 20; i++) {
-            await page.keyboard.press("ArrowRight");
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 20, () =>
+            page.keyboard.press("ArrowRight")
+          );
 
-          for (let i = 0; i < 2; i++) {
-            await kbBigMoveDown(page);
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 2, () => kbBigMoveDown(page));
 
-          for (let i = 0; i < 20; i++) {
-            await page.keyboard.press("ArrowLeft");
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 20, () =>
+            page.keyboard.press("ArrowLeft")
+          );
 
-          for (let i = 0; i < 2; i++) {
-            await kbBigMoveUp(page);
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 2, () => kbBigMoveUp(page));
 
-          for (let i = 0; i < 2; i++) {
-            await kbBigMoveRight(page);
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 2, () => kbBigMoveRight(page));
 
-          for (let i = 0; i < 2; i++) {
-            await kbBigMoveLeft(page);
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 2, () => kbBigMoveLeft(page));
 
           await page.type(`${selectorEditor} .internal`, data);
           await page.keyboard.press("Escape");
@@ -2171,20 +2124,13 @@ describe("FreeText Editor", () => {
         "tracemonkey.pdf",
         ".annotationEditorLayer",
         100,
-        async page => {
-          await page.waitForFunction(async () => {
-            await window.PDFViewerApplication.initializedPromise;
-            return true;
-          });
-          await page.evaluate(() => {
+        {
+          eventBusSetup: eventBus => {
             window.visitedPages = [];
-            window.PDFViewerApplication.eventBus.on(
-              "pagechanging",
-              ({ pageNumber }) => {
-                window.visitedPages.push(pageNumber);
-              }
-            );
-          });
+            eventBus.on("pagechanging", ({ pageNumber }) => {
+              window.visitedPages.push(pageNumber);
+            });
+          },
         }
       );
     });
@@ -2316,11 +2262,8 @@ describe("FreeText Editor", () => {
 
           const { y: y0, height } = await getRect(page, getEditorSelector(0));
           const selectorEditor = getEditorSelector(1);
-          let xy = await getXY(page, selectorEditor);
           while ((await getRect(page, selectorEditor)).y > y0 - height) {
-            await kbBigMoveUp(page);
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
+            await moveEditor(page, selectorEditor, 1, () => kbBigMoveUp(page));
           }
 
           // The editor must be moved in the DOM and potentially the focus
@@ -2359,29 +2302,29 @@ describe("FreeText Editor", () => {
           const allPositions = [];
 
           for (let i = 0; i < 10; i++) {
+            const editorSelector = getEditorSelector(i);
             await page.mouse.click(rect.x + 10 + 30 * i, rect.y + 100 + 5 * i);
-            await page.waitForSelector(getEditorSelector(i), {
+            await page.waitForSelector(editorSelector, {
               visible: true,
             });
             await page.type(
-              `${getEditorSelector(i)} .internal`,
+              `${editorSelector} .internal`,
               String.fromCharCode(65 + i)
             );
 
             // Commit.
             await page.keyboard.press("Escape");
-            await page.waitForSelector(
-              `${getEditorSelector(i)} .overlay.enabled`
-            );
+            await page.waitForSelector(`${editorSelector} .overlay.enabled`);
 
-            allPositions.push(await getRect(page, getEditorSelector(i)));
+            allPositions.push(await getRect(page, editorSelector));
           }
 
           await selectAll(page);
-          await dragAndDropAnnotation(page, rect.x + 161, rect.y + 126, 39, 74);
+          await dragAndDrop(page, getEditorSelector(4), [[39, 74]]);
 
           for (let i = 0; i < 10; i++) {
-            const pos = await getRect(page, getEditorSelector(i));
+            const editorSelector = getEditorSelector(i);
+            const pos = await getRect(page, editorSelector);
             const oldPos = allPositions[i];
             expect(Math.abs(Math.round(pos.x - oldPos.x) - 39))
               .withContext(`In ${browserName}`)
@@ -2403,19 +2346,12 @@ describe("FreeText Editor", () => {
         "tracemonkey.pdf",
         ".annotationEditorLayer",
         100,
-        async page => {
-          await page.waitForFunction(async () => {
-            await window.PDFViewerApplication.initializedPromise;
-            return true;
-          });
-          await page.evaluate(() => {
-            window.PDFViewerApplication.eventBus.on(
-              "annotationeditorstateschanged",
-              ({ details }) => {
-                window.editingEvents?.push(details);
-              }
-            );
-          });
+        {
+          eventBusSetup: eventBus => {
+            eventBus.on("annotationeditorstateschanged", ({ details }) => {
+              window.editingEvents?.push(details);
+            });
+          },
         }
       );
     });
@@ -2755,7 +2691,7 @@ describe("FreeText Editor", () => {
     it("must create an editor from the toolbar", async () => {
       await Promise.all(
         pages.map(async ([browserName, page]) => {
-          await page.focus("#editorFreeText");
+          await page.focus("#editorFreeTextButton");
           await page.keyboard.press("Enter");
 
           let selectorEditor = getEditorSelector(0);
@@ -2763,12 +2699,7 @@ describe("FreeText Editor", () => {
             visible: true,
           });
 
-          let xy = await getXY(page, selectorEditor);
-          for (let i = 0; i < 5; i++) {
-            await kbBigMoveUp(page);
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 5, () => kbBigMoveUp(page));
 
           const data = "Hello PDF.js World !!";
           await page.type(`${selectorEditor} .internal`, data);
@@ -2786,19 +2717,14 @@ describe("FreeText Editor", () => {
           // Disable editing mode.
           await switchToFreeText(page, /* disable = */ true);
 
-          await page.focus("#editorFreeText");
+          await page.focus("#editorFreeTextButton");
           await page.keyboard.press(" ");
           selectorEditor = getEditorSelector(1);
           await page.waitForSelector(selectorEditor, {
             visible: true,
           });
 
-          xy = await getXY(page, selectorEditor);
-          for (let i = 0; i < 5; i++) {
-            await kbBigMoveDown(page);
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 5, () => kbBigMoveDown(page));
 
           await page.type(`${selectorEditor} .internal`, data);
 
@@ -2828,12 +2754,7 @@ describe("FreeText Editor", () => {
             visible: true,
           });
 
-          let xy = await getXY(page, selectorEditor);
-          for (let i = 0; i < 10; i++) {
-            await kbBigMoveLeft(page);
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 10, () => kbBigMoveLeft(page));
 
           const data = "Hello PDF.js World !!";
           await page.type(`${selectorEditor} .internal`, data);
@@ -2858,12 +2779,9 @@ describe("FreeText Editor", () => {
             visible: true,
           });
 
-          xy = await getXY(page, selectorEditor);
-          for (let i = 0; i < 10; i++) {
-            await kbBigMoveRight(page);
-            await waitForPositionChange(page, selectorEditor, xy);
-            xy = await getXY(page, selectorEditor);
-          }
+          await moveEditor(page, selectorEditor, 10, () =>
+            kbBigMoveRight(page)
+          );
 
           await page.type(`${selectorEditor} .internal`, data);
 
@@ -3603,7 +3521,7 @@ describe("FreeText Editor", () => {
             "[data-annotation-id='998R']",
             el => (el.hidden = false)
           );
-          let editorImage = PNG.sync.read(editorPng);
+          let editorImage = PNG.sync.read(Buffer.from(editorPng));
           expect(editorImage.data.every(x => x === 0xff))
             .withContext(`In ${browserName}`)
             .toBeTrue();
@@ -3650,10 +3568,174 @@ describe("FreeText Editor", () => {
             clip: editorRect,
             type: "png",
           });
-          editorImage = PNG.sync.read(editorPng);
+          editorImage = PNG.sync.read(Buffer.from(editorPng));
           expect(editorImage.data.every(x => x === 0xff))
             .withContext(`In ${browserName}`)
             .toBeFalse();
+        })
+      );
+    });
+  });
+
+  describe("Freetext and shift+enter", () => {
+    let pages;
+
+    beforeAll(async () => {
+      pages = await loadAndWait("empty.pdf", ".annotationEditorLayer");
+    });
+
+    afterAll(async () => {
+      await closePages(pages);
+    });
+
+    it("must check that a freetext has the correct data", async () => {
+      await Promise.all(
+        pages.map(async ([browserName, page]) => {
+          await switchToFreeText(page);
+
+          const rect = await getRect(page, ".annotationEditorLayer");
+          const editorSelector = getEditorSelector(0);
+
+          const data = "Hello\nPDF.js\nWorld\n!!";
+          await page.mouse.click(rect.x + 100, rect.y + 100);
+          await page.waitForSelector(editorSelector, {
+            visible: true,
+          });
+          for (const line of data.split("\n")) {
+            await page.type(`${editorSelector} .internal`, line);
+            await page.keyboard.down("Shift");
+            await page.keyboard.press("Enter");
+            await page.keyboard.up("Shift");
+          }
+
+          // Commit.
+          await page.keyboard.press("Escape");
+          await page.waitForSelector(`${editorSelector} .overlay.enabled`);
+          await waitForSerialized(page, 1);
+
+          const serialized = await getSerialized(page, x => x.value);
+          expect(serialized[0]).withContext(`In ${browserName}`).toEqual(data);
+        })
+      );
+    });
+  });
+
+  describe("Undo deletion popup has the expected behaviour", () => {
+    let pages;
+    const editorSelector = getEditorSelector(0);
+
+    beforeEach(async () => {
+      pages = await loadAndWait("tracemonkey.pdf", ".annotationEditorLayer");
+    });
+
+    afterEach(async () => {
+      await closePages(pages);
+    });
+
+    it("must check that deleting a FreeText editor can be undone using the undo button", async () => {
+      await Promise.all(
+        pages.map(async ([browserName, page]) => {
+          await switchToFreeText(page);
+
+          const rect = await getRect(page, ".annotationEditorLayer");
+          const data = "Hello PDF.js World !!";
+          await page.mouse.click(rect.x + 100, rect.y + 100);
+          await page.waitForSelector(editorSelector, {
+            visible: true,
+          });
+          await page.type(`${editorSelector} .internal`, data);
+
+          // Commit.
+          await page.keyboard.press("Escape");
+          await page.waitForSelector(`${editorSelector} .overlay.enabled`);
+          await waitForSerialized(page, 1);
+
+          await page.waitForSelector(`${editorSelector} button.delete`);
+          await page.click(`${editorSelector} button.delete`);
+          await waitForSerialized(page, 0);
+
+          await page.waitForSelector("#editorUndoBar:not([hidden])");
+          await page.click("#editorUndoBarUndoButton");
+          await waitForSerialized(page, 1);
+          await page.waitForSelector(editorSelector);
+        })
+      );
+    });
+
+    it("must check that the undo deletion popup displays the correct message", async () => {
+      await Promise.all(
+        pages.map(async ([browserName, page]) => {
+          await switchToFreeText(page);
+
+          const rect = await getRect(page, ".annotationEditorLayer");
+          const data = "Hello PDF.js World !!";
+          await page.mouse.click(rect.x + 100, rect.y + 100);
+          await page.waitForSelector(editorSelector, {
+            visible: true,
+          });
+          await page.type(`${editorSelector} .internal`, data);
+
+          // Commit.
+          await page.keyboard.press("Escape");
+          await page.waitForSelector(`${editorSelector} .overlay.enabled`);
+          await waitForSerialized(page, 1);
+
+          await page.waitForSelector(`${editorSelector} button.delete`);
+          await page.click(`${editorSelector} button.delete`);
+          await waitForSerialized(page, 0);
+
+          await page.waitForFunction(() => {
+            const messageElement = document.querySelector(
+              "#editorUndoBarMessage"
+            );
+            return messageElement && messageElement.textContent.trim() !== "";
+          });
+          const message = await page.waitForSelector("#editorUndoBarMessage");
+          const messageText = await page.evaluate(
+            el => el.textContent,
+            message
+          );
+          expect(messageText).toContain("Text removed");
+        })
+      );
+    });
+
+    it("must check that the popup disappears when a new textbox is created", async () => {
+      await Promise.all(
+        pages.map(async ([browserName, page]) => {
+          await switchToFreeText(page);
+
+          let rect = await getRect(page, ".annotationEditorLayer");
+          const data = "Hello PDF.js World !!";
+          await page.mouse.click(rect.x + 100, rect.y + 100);
+          await page.waitForSelector(editorSelector, {
+            visible: true,
+          });
+          await page.type(`${editorSelector} .internal`, data);
+
+          await page.keyboard.press("Escape");
+          await page.waitForSelector(`${editorSelector} .overlay.enabled`);
+          await waitForSerialized(page, 1);
+
+          await page.waitForSelector(`${editorSelector} button.delete`);
+          await page.click(`${editorSelector} button.delete`);
+          await waitForSerialized(page, 0);
+
+          await page.waitForSelector("#editorUndoBar:not([hidden])");
+          rect = await getRect(page, ".annotationEditorLayer");
+          const newData = "This is a new text box!";
+          await page.mouse.click(rect.x + 150, rect.y + 150);
+          await page.waitForSelector(getEditorSelector(1), {
+            visible: true,
+          });
+          await page.type(`${getEditorSelector(1)} .internal`, newData);
+
+          await page.keyboard.press("Escape");
+          await page.waitForSelector(
+            `${getEditorSelector(1)} .overlay.enabled`
+          );
+          await waitForSerialized(page, 1);
+          await page.waitForSelector("#editorUndoBar", { hidden: true });
         })
       );
     });

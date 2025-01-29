@@ -2,6 +2,7 @@
 *.error
 
 !boundingBox_invalid.pdf
+!pdkids.pdf
 !tracemonkey.pdf
 !TrueType_without_cmap.pdf
 !franz.pdf
@@ -155,6 +156,7 @@
 !bug1020858.pdf
 !prefilled_f1040.pdf
 !bug1050040.pdf
+!issue18986.pdf
 !bug1200096.pdf
 !bug1068432.pdf
 !issue12295.pdf
@@ -230,6 +232,7 @@
 !issue5954.pdf
 !issue6612.pdf
 !alphatrans.pdf
+!issue14200.pdf
 !pattern_text_embedded_font.pdf
 !devicen.pdf
 !cmykjpeg.pdf
@@ -551,6 +554,7 @@
 !poppler-67295-0.pdf
 !poppler-85140-0.pdf
 !issue15012.pdf
+!issue19176.pdf
 !issue15150.pdf
 !poppler-395-0-fuzzed.pdf
 !issue14165.pdf
@@ -564,6 +568,7 @@
 !poppler-90-0-fuzzed.pdf
 !issue14415.pdf
 !issue14307.pdf
+!issue18645.pdf
 !issue14497.pdf
 !bug1799927.pdf
 !issue14502.pdf
@@ -588,6 +593,7 @@
 !issue15690.pdf
 !bug1802888.pdf
 !issue15759.pdf
+!issue18823.pdf
 !issue15753.pdf
 !issue15789.pdf
 !fields_order.pdf
@@ -660,3 +666,29 @@
 !issue18099_reduced.pdf
 !file_pdfjs_test.pdf
 !issue18536.pdf
+!issue18561.pdf
+!highlights.pdf
+!highlight.pdf
+!bug1708040.pdf
+!issue18694.pdf
+!issue18693.pdf
+!bug1918115.pdf
+!bug1919513.pdf
+!issue16038.pdf
+!highlight_popup.pdf
+!issue18072.pdf
+!stamps.pdf
+!issue15096.pdf
+!issue18036.pdf
+!issue18894.pdf
+!bug1922766.pdf
+!issue18956.pdf
+!issue19083.pdf
+!issue19120.pdf
+!bug1934157.pdf
+!rotated_ink.pdf
+!inks.pdf
+!inks_basic.pdf
+!issue19182.pdf
+!issue18911.pdf
+!issue19207.pdf

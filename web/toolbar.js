@@ -21,7 +21,7 @@ import {
   DEFAULT_SCALE_VALUE,
   MAX_SCALE,
   MIN_SCALE,
-  toggleCheckedBtn,
+  toggleExpandedBtn,
 } from "./ui_utils.js";
 
 /**
@@ -112,6 +112,10 @@ class Toolbar {
               : AnnotationEditorType.STAMP;
           },
         },
+        telemetry: {
+          type: "editing",
+          data: { action: "pdfjs.image.icon_click" },
+        },
       },
     ];
 
@@ -122,7 +126,18 @@ class Toolbar {
     this.reset();
   }
 
-  #updateToolbarDensity() {}
+  #updateToolbarDensity({ value }) {
+    let name = "normal";
+    switch (value) {
+      case 1:
+        name = "compact";
+        break;
+      case 2:
+        name = "touch";
+        break;
+    }
+    document.documentElement.setAttribute("data-toolbar-density", name);
+  }
 
   #setAnnotationEditorUIManager(uiManager, parentContainer) {
     const colorPicker = new ColorPicker({ uiManager });
@@ -173,7 +188,7 @@ class Toolbar {
     const self = this;
 
     // The buttons within the toolbar.
-    for (const { element, eventName, eventDetails } of buttons) {
+    for (const { element, eventName, eventDetails, telemetry } of buttons) {
       element.addEventListener("click", evt => {
         if (eventName !== null) {
           eventBus.dispatch(eventName, {
@@ -181,6 +196,12 @@ class Toolbar {
             ...eventDetails,
             // evt.detail is the number of clicks.
             isFromKeyboard: evt.detail === 0,
+          });
+        }
+        if (telemetry) {
+          eventBus.dispatch("reporttelemetry", {
+            source: this,
+            details: telemetry,
           });
         }
       });
@@ -260,22 +281,22 @@ class Toolbar {
       editorStampParamsToolbar,
     } = this.#opts;
 
-    toggleCheckedBtn(
+    toggleExpandedBtn(
       editorFreeTextButton,
       mode === AnnotationEditorType.FREETEXT,
       editorFreeTextParamsToolbar
     );
-    toggleCheckedBtn(
+    toggleExpandedBtn(
       editorHighlightButton,
       mode === AnnotationEditorType.HIGHLIGHT,
       editorHighlightParamsToolbar
     );
-    toggleCheckedBtn(
+    toggleExpandedBtn(
       editorInkButton,
       mode === AnnotationEditorType.INK,
       editorInkParamsToolbar
     );
-    toggleCheckedBtn(
+    toggleExpandedBtn(
       editorStampButton,
       mode === AnnotationEditorType.STAMP,
       editorStampParamsToolbar

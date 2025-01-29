@@ -25,7 +25,7 @@ const {
   TextLayer,
   XfaLayer,
 } = pdfjsLib;
-const { Outliner } = pdfjsTestingUtils;
+const { HighlightOutliner } = pdfjsTestingUtils;
 const { GenericL10n, parseQueryString, SimpleLinkService } = pdfjsViewer;
 
 const WAITING_TIME = 100; // ms
@@ -370,19 +370,51 @@ class Rasterize {
       }
       // We set the borderWidth to 0.001 to slighly increase the size of the
       // boxes so that they can be merged together.
-      const outliner = new Outliner(boxes, /* borderWidth = */ 0.001);
+      const outliner = new HighlightOutliner(boxes, /* borderWidth = */ 0.001);
       // We set the borderWidth to 0.0025 in order to have an outline which is
       // slightly bigger than the highlight itself.
       // We must add an inner margin to avoid to have a partial outline.
-      const outlinerForOutline = new Outliner(
+      const outlinerForOutline = new HighlightOutliner(
         boxes,
         /* borderWidth = */ 0.0025,
         /* innerMargin = */ 0.001
       );
       const drawLayer = new DrawLayer({ pageIndex: 0 });
       drawLayer.setParent(div);
-      drawLayer.highlight(outliner.getOutlines(), "orange", 0.4);
-      drawLayer.highlightOutline(outlinerForOutline.getOutlines());
+      const outlines = outliner.getOutlines();
+      drawLayer.draw(
+        {
+          bbox: outlines.box,
+          root: {
+            viewBox: "0 0 1 1",
+            fill: "orange",
+            "fill-opacity": 0.4,
+          },
+          rootClass: {
+            highlight: true,
+            free: false,
+          },
+          path: {
+            d: outlines.toSVGPath(),
+          },
+        },
+        /* isPathUpdatable = */ false,
+        /* hasClip = */ true
+      );
+      const focusLine = outlinerForOutline.getOutlines();
+      drawLayer.drawOutline(
+        {
+          rootClass: {
+            highlightOutline: true,
+            free: false,
+          },
+          bbox: focusLine.box,
+          path: {
+            d: focusLine.toSVGPath(),
+          },
+        },
+        /* mustRemoveSelfIntersections = */ false
+      );
 
       svg.append(foreignObject);
 
@@ -592,6 +624,7 @@ class Driver {
         }
         const isOffscreenCanvasSupported =
           task.isOffscreenCanvasSupported === false ? false : undefined;
+        const disableFontFace = task.disableFontFace === true;
 
         const loadingTask = getDocument({
           url: new URL(task.file, window.location),
@@ -605,12 +638,13 @@ class Driver {
           enableXfa: task.enableXfa,
           isOffscreenCanvasSupported,
           styleElement: xfaStyleElement,
+          disableFontFace,
         });
         let promise = loadingTask.promise;
 
         if (task.annotationStorage) {
           for (const annotation of Object.values(task.annotationStorage)) {
-            const { bitmapName, quadPoints } = annotation;
+            const { bitmapName, quadPoints, paths, outlines } = annotation;
             if (bitmapName) {
               promise = promise.then(async doc => {
                 const response = await fetch(
@@ -647,6 +681,36 @@ class Driver {
               // Just to ensure that the quadPoints are always a Float32Array
               // like IRL (in order to avoid bugs like bug 1907958).
               annotation.quadPoints = new Float32Array(quadPoints);
+            }
+            if (paths) {
+              for (let i = 0, ii = paths.lines.length; i < ii; i++) {
+                paths.lines[i] = Float32Array.from(
+                  paths.lines[i],
+                  x => x ?? NaN
+                );
+              }
+              for (let i = 0, ii = paths.points.length; i < ii; i++) {
+                paths.points[i] = Float32Array.from(
+                  paths.points[i],
+                  x => x ?? NaN
+                );
+              }
+            }
+            if (outlines) {
+              if (Array.isArray(outlines)) {
+                for (let i = 0, ii = outlines.length; i < ii; i++) {
+                  outlines[i] = Float32Array.from(outlines[i], x => x ?? NaN);
+                }
+              } else {
+                outlines.outline = Float32Array.from(
+                  outlines.outline,
+                  x => x ?? NaN
+                );
+                outlines.points = Float32Array.from(
+                  outlines.points,
+                  x => x ?? NaN
+                );
+              }
             }
           }
         }
@@ -782,7 +846,7 @@ class Driver {
       }
     }
 
-    if (task.skipPages && task.skipPages.includes(task.pageNum)) {
+    if (task.skipPages?.includes(task.pageNum)) {
       this._log(
         " Skipping page " + task.pageNum + "/" + task.pdfDoc.numPages + "...\n"
       );
@@ -1075,7 +1139,7 @@ class Driver {
       this.output.textContent += message;
     }
 
-    if (message.lastIndexOf("\n") >= 0 && !this.disableScrolling.checked) {
+    if (message.includes("\n") && !this.disableScrolling.checked) {
       // Scroll to the bottom of the page
       this.output.scrollTop = this.output.scrollHeight;
     }
@@ -1130,7 +1194,7 @@ class Driver {
         resolve();
       })
       .catch(reason => {
-        console.warn(`Driver._send failed (${url}): ${reason}`);
+        console.warn(`Driver._send failed (${url}):`, reason);
 
         this.inFlightRequests--;
         resolve();

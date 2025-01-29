@@ -484,6 +484,7 @@ class CanvasExtraState {
     this.fillColor = "#000000";
     this.strokeColor = "#000000";
     this.patternFill = false;
+    this.patternStroke = false;
     // Note: fill alpha applies to all non-stroking operations
     this.fillAlpha = 1;
     this.strokeAlpha = 1;
@@ -586,7 +587,7 @@ class CanvasExtraState {
 }
 
 function putBinaryImageData(ctx, imgData) {
-  if (typeof ImageData !== "undefined" && imgData instanceof ImageData) {
+  if (imgData instanceof ImageData) {
     ctx.putImageData(imgData, 0, 0);
     return;
   }
@@ -1059,8 +1060,10 @@ class CanvasGraphics {
     // Vertical or horizontal scaling shall not be more than 2 to not lose the
     // pixels during drawImage operation, painting on the temporary canvas(es)
     // that are twice smaller in size.
-    const width = img.width;
-    const height = img.height;
+
+    // displayWidth and displayHeight are used for VideoFrame.
+    const width = img.width ?? img.displayWidth;
+    const height = img.height ?? img.displayHeight;
     let widthScale = Math.max(
       Math.hypot(inverseTransform[0], inverseTransform[1]),
       1
@@ -1496,6 +1499,7 @@ class CanvasGraphics {
     let maskY = layerOffsetY - maskOffsetY;
 
     if (backdrop) {
+      const backdropRGB = Util.makeHexColor(...backdrop);
       if (
         maskX < 0 ||
         maskY < 0 ||
@@ -1509,16 +1513,14 @@ class CanvasGraphics {
         );
         const ctx = canvas.context;
         ctx.drawImage(maskCanvas, -maskX, -maskY);
-        if (backdrop.some(c => c !== 0)) {
-          ctx.globalCompositeOperation = "destination-atop";
-          ctx.fillStyle = Util.makeHexColor(...backdrop);
-          ctx.fillRect(0, 0, width, height);
-          ctx.globalCompositeOperation = "source-over";
-        }
+        ctx.globalCompositeOperation = "destination-atop";
+        ctx.fillStyle = backdropRGB;
+        ctx.fillRect(0, 0, width, height);
+        ctx.globalCompositeOperation = "source-over";
 
         maskCanvas = canvas.canvas;
         maskX = maskY = 0;
-      } else if (backdrop.some(c => c !== 0)) {
+      } else {
         maskCtx.save();
         maskCtx.globalAlpha = 1;
         maskCtx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1526,7 +1528,7 @@ class CanvasGraphics {
         clip.rect(maskX, maskY, width, height);
         maskCtx.clip(clip);
         maskCtx.globalCompositeOperation = "destination-atop";
-        maskCtx.fillStyle = Util.makeHexColor(...backdrop);
+        maskCtx.fillStyle = backdropRGB;
         maskCtx.fillRect(maskX, maskY, width, height);
         maskCtx.restore();
       }
@@ -1883,15 +1885,19 @@ class CanvasGraphics {
       return;
     }
 
-    ctx.save();
-    ctx.beginPath();
-    for (const path of paths) {
-      ctx.setTransform(...path.transform);
-      ctx.translate(path.x, path.y);
-      path.addToPath(ctx, path.fontSize);
+    const newPath = new Path2D();
+    const invTransf = ctx.getTransform().invertSelf();
+    for (const { transform, x, y, fontSize, path } of paths) {
+      newPath.addPath(
+        path,
+        new DOMMatrix(transform)
+          .preMultiplySelf(invTransf)
+          .translate(x, y)
+          .scale(fontSize, -fontSize)
+      );
     }
-    ctx.restore();
-    ctx.clip();
+
+    ctx.clip(newPath);
     ctx.beginPath();
     delete this.pendingTextPaths;
   }
@@ -2000,7 +2006,16 @@ class CanvasGraphics {
     this.moveText(0, this.current.leading);
   }
 
-  paintChar(character, x, y, patternTransform) {
+  #getScaledPath(path, currentTransform, transform) {
+    const newPath = new Path2D();
+    newPath.addPath(
+      path,
+      new DOMMatrix(transform).invertSelf().multiplySelf(currentTransform)
+    );
+    return newPath;
+  }
+
+  paintChar(character, x, y, patternFillTransform, patternStrokeTransform) {
     const ctx = this.ctx;
     const current = this.current;
     const font = current.font;
@@ -2012,31 +2027,50 @@ class CanvasGraphics {
       textRenderingMode & TextRenderingMode.ADD_TO_PATH_FLAG
     );
     const patternFill = current.patternFill && !font.missingFile;
+    const patternStroke = current.patternStroke && !font.missingFile;
 
-    let addToPath;
-    if (font.disableFontFace || isAddToPathSet || patternFill) {
-      addToPath = font.getPathGenerator(this.commonObjs, character);
+    let path;
+    if (
+      font.disableFontFace ||
+      isAddToPathSet ||
+      patternFill ||
+      patternStroke
+    ) {
+      path = font.getPathGenerator(this.commonObjs, character);
     }
 
-    if (font.disableFontFace || patternFill) {
+    if (font.disableFontFace || patternFill || patternStroke) {
       ctx.save();
       ctx.translate(x, y);
-      ctx.beginPath();
-      addToPath(ctx, fontSize);
-      if (patternTransform) {
-        ctx.setTransform(...patternTransform);
-      }
+      ctx.scale(fontSize, -fontSize);
       if (
         fillStrokeMode === TextRenderingMode.FILL ||
         fillStrokeMode === TextRenderingMode.FILL_STROKE
       ) {
-        ctx.fill();
+        if (patternFillTransform) {
+          const currentTransform = ctx.getTransform();
+          ctx.setTransform(...patternFillTransform);
+          ctx.fill(
+            this.#getScaledPath(path, currentTransform, patternFillTransform)
+          );
+        } else {
+          ctx.fill(path);
+        }
       }
       if (
         fillStrokeMode === TextRenderingMode.STROKE ||
         fillStrokeMode === TextRenderingMode.FILL_STROKE
       ) {
-        ctx.stroke();
+        if (patternStrokeTransform) {
+          const currentTransform = ctx.getTransform();
+          ctx.setTransform(...patternStrokeTransform);
+          ctx.stroke(
+            this.#getScaledPath(path, currentTransform, patternStrokeTransform)
+          );
+        } else {
+          ctx.lineWidth /= fontSize;
+          ctx.stroke(path);
+        }
       }
       ctx.restore();
     } else {
@@ -2061,7 +2095,7 @@ class CanvasGraphics {
         x,
         y,
         fontSize,
-        addToPath,
+        path,
       });
     }
   }
@@ -2126,7 +2160,7 @@ class CanvasGraphics {
       ctx.scale(textHScale, 1);
     }
 
-    let patternTransform;
+    let patternFillTransform, patternStrokeTransform;
     if (current.patternFill) {
       ctx.save();
       const pattern = current.fillColor.getPattern(
@@ -2135,9 +2169,22 @@ class CanvasGraphics {
         getCurrentTransformInverse(ctx),
         PathType.FILL
       );
-      patternTransform = getCurrentTransform(ctx);
+      patternFillTransform = getCurrentTransform(ctx);
       ctx.restore();
       ctx.fillStyle = pattern;
+    }
+
+    if (current.patternStroke) {
+      ctx.save();
+      const pattern = current.strokeColor.getPattern(
+        ctx,
+        this,
+        getCurrentTransformInverse(ctx),
+        PathType.STROKE
+      );
+      patternStrokeTransform = getCurrentTransform(ctx);
+      ctx.restore();
+      ctx.strokeStyle = pattern;
     }
 
     let lineWidth = current.lineWidth;
@@ -2232,7 +2279,13 @@ class CanvasGraphics {
           // common case
           ctx.fillText(character, scaledX, scaledY);
         } else {
-          this.paintChar(character, scaledX, scaledY, patternTransform);
+          this.paintChar(
+            character,
+            scaledX,
+            scaledY,
+            patternFillTransform,
+            patternStrokeTransform
+          );
           if (accent) {
             const scaledAccentX =
               scaledX + (fontSize * accent.offset.x) / fontSizeScale;
@@ -2242,7 +2295,8 @@ class CanvasGraphics {
               accent.fontChar,
               scaledAccentX,
               scaledAccentY,
-              patternTransform
+              patternFillTransform,
+              patternStrokeTransform
             );
           }
         }
@@ -2378,6 +2432,7 @@ class CanvasGraphics {
 
   setStrokeColorN() {
     this.current.strokeColor = this.getColorN_Pattern(arguments);
+    this.current.patternStroke = true;
   }
 
   setFillColorN() {
@@ -2391,10 +2446,12 @@ class CanvasGraphics {
       g,
       b
     );
+    this.current.patternStroke = false;
   }
 
   setStrokeTransparent() {
     this.ctx.strokeStyle = this.current.strokeColor = "transparent";
+    this.current.patternStroke = false;
   }
 
   setFillRGBColor(r, g, b) {
@@ -2701,9 +2758,12 @@ class CanvasGraphics {
       } else {
         resetCtxToDefault(this.ctx);
 
+        // Consume a potential path before clipping.
+        this.endPath();
+
         this.ctx.rect(rect[0], rect[1], width, height);
         this.ctx.clip();
-        this.endPath();
+        this.ctx.beginPath();
       }
     }
 

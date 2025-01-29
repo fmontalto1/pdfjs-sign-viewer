@@ -37,41 +37,42 @@ window.PDFViewerApplicationOptions = AppOptions;
 function getViewerConfiguration() {
   return {
     appContainer: document.body,
+    principalContainer: document.getElementById("mainContainer"),
     mainContainer: document.getElementById("viewerContainer"),
     viewerContainer: document.getElementById("viewer"),
     toolbar: {
-      container: document.getElementById("toolbarViewer"),
+      container: document.getElementById("toolbarContainer"),
       numPages: document.getElementById("numPages"),
       pageNumber: document.getElementById("pageNumber"),
       scaleSelect: document.getElementById("scaleSelect"),
       customScaleOption: document.getElementById("customScaleOption"),
       previous: document.getElementById("previous"),
       next: document.getElementById("next"),
-      zoomIn: document.getElementById("zoomIn"),
-      zoomOut: document.getElementById("zoomOut"),
-      print: document.getElementById("print"),
-      editorFreeTextButton: document.getElementById("editorFreeText"),
+      zoomIn: document.getElementById("zoomInButton"),
+      zoomOut: document.getElementById("zoomOutButton"),
+      print: document.getElementById("printButton"),
+      editorFreeTextButton: document.getElementById("editorFreeTextButton"),
       editorFreeTextParamsToolbar: document.getElementById(
         "editorFreeTextParamsToolbar"
       ),
-      editorHighlightButton: document.getElementById("editorHighlight"),
+      editorHighlightButton: document.getElementById("editorHighlightButton"),
       editorHighlightParamsToolbar: document.getElementById(
         "editorHighlightParamsToolbar"
       ),
       editorHighlightColorPicker: document.getElementById(
         "editorHighlightColorPicker"
       ),
-      editorInkButton: document.getElementById("editorInk"),
+      editorInkButton: document.getElementById("editorInkButton"),
       editorInkParamsToolbar: document.getElementById("editorInkParamsToolbar"),
-      editorStampButton: document.getElementById("editorStamp"),
+      editorStampButton: document.getElementById("editorStampButton"),
       editorStampParamsToolbar: document.getElementById(
         "editorStampParamsToolbar"
       ),
-      download: document.getElementById("download"),
+      download: document.getElementById("downloadButton"),
     },
     secondaryToolbar: {
       toolbar: document.getElementById("secondaryToolbar"),
-      toggleButton: document.getElementById("secondaryToolbarToggle"),
+      toggleButton: document.getElementById("secondaryToolbarToggleButton"),
       presentationModeButton: document.getElementById("presentationMode"),
       openFileButton:
         typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")
@@ -105,7 +106,7 @@ function getViewerConfiguration() {
       // Divs (and sidebar button)
       outerContainer: document.getElementById("outerContainer"),
       sidebarContainer: document.getElementById("sidebarContainer"),
-      toggleButton: document.getElementById("sidebarToggle"),
+      toggleButton: document.getElementById("sidebarToggleButton"),
       resizer: document.getElementById("sidebarResizer"),
       // Buttons
       thumbnailButton: document.getElementById("viewThumbnail"),
@@ -122,7 +123,7 @@ function getViewerConfiguration() {
     },
     findBar: {
       bar: document.getElementById("findbar"),
-      toggleButton: document.getElementById("viewFind"),
+      toggleButton: document.getElementById("viewFindButton"),
       findField: document.getElementById("findInput"),
       highlightAllCheckbox: document.getElementById("findHighlightAll"),
       caseSensitiveCheckbox: document.getElementById("findMatchCase"),
@@ -130,8 +131,8 @@ function getViewerConfiguration() {
       entireWordCheckbox: document.getElementById("findEntireWord"),
       findMsg: document.getElementById("findMsg"),
       findResultsCount: document.getElementById("findResultsCount"),
-      findPreviousButton: document.getElementById("findPrevious"),
-      findNextButton: document.getElementById("findNext"),
+      findPreviousButton: document.getElementById("findPreviousButton"),
+      findNextButton: document.getElementById("findNextButton"),
     },
     passwordOverlay: {
       dialog: document.getElementById("passwordDialog"),
@@ -222,6 +223,12 @@ function getViewerConfiguration() {
       editorHighlightShowAll: document.getElementById("editorHighlightShowAll"),
     },
     printContainer: document.getElementById("printContainer"),
+    editorUndoBar: {
+      container: document.getElementById("editorUndoBar"),
+      message: document.getElementById("editorUndoBarMessage"),
+      undoButton: document.getElementById("editorUndoBarUndoButton"),
+      closeButton: document.getElementById("editorUndoBarCloseButton"),
+    },
   };
 }
 
@@ -247,7 +254,7 @@ function webViewerLoad() {
     } catch (ex) {
       // The viewer could be in e.g. a cross-origin <iframe> element,
       // fallback to dispatching the event at the current `document`.
-      console.error(`webviewerloaded: ${ex}`);
+      console.error("webviewerloaded:", ex);
       document.dispatchEvent(event);
     }
   }

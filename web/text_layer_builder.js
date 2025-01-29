@@ -20,7 +20,7 @@
 // eslint-disable-next-line max-len
 /** @typedef {import("./text_accessibility.js").TextAccessibilityManager} TextAccessibilityManager */
 
-import { normalizeUnicode, TextLayer } from "pdfjs-lib";
+import { normalizeUnicode, stopEvent, TextLayer } from "pdfjs-lib";
 import { removeNullCharacters } from "./ui_utils.js";
 
 /**
@@ -162,8 +162,7 @@ class TextLayerBuilder {
           removeNullCharacters(normalizeUnicode(selection.toString()))
         );
       }
-      event.preventDefault();
-      event.stopPropagation();
+      stopEvent(event);
     });
 
     TextLayerBuilder.#textLayers.set(div, end);
@@ -299,7 +298,7 @@ class TextLayerBuilder {
           anchor = anchor.parentNode;
         }
 
-        const parentTextLayer = anchor.parentElement.closest(".textLayer");
+        const parentTextLayer = anchor.parentElement?.closest(".textLayer");
         const endDiv = this.#textLayers.get(parentTextLayer);
         if (endDiv) {
           endDiv.style.width = parentTextLayer.style.width;

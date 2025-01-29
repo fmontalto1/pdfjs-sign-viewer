@@ -1244,7 +1244,7 @@ class Font {
         getDingbatsGlyphsUnicode(),
         this.differences
       );
-    } else if (isStandardFont) {
+    } else if (isStandardFont || isMappedToStandardFont) {
       const map = buildToFontChar(
         this.defaultEncoding,
         getGlyphsUnicode(),
@@ -2387,7 +2387,7 @@ class Font {
           } else {
             for (j = 0; j < n; j++) {
               b = data[i++];
-              stack.push((b << 8) | data[i++]);
+              stack.push(signedInt16(b, data[i++]));
             }
           }
         } else if (op === 0x2b && !tooComplexToFollowFunctions) {

@@ -26,6 +26,7 @@
 import {
   AbortException,
   AnnotationMode,
+  OutputScale,
   PixelsPerInch,
   RenderingCancelledException,
   setLayerDimensions,
@@ -33,9 +34,9 @@ import {
 } from "pdfjs-lib";
 import {
   approximateFraction,
+  calcRound,
   DEFAULT_SCALE,
   floorToDivide,
-  OutputScale,
   RenderingStates,
   TextLayerMode,
 } from "./ui_utils.js";
@@ -115,6 +116,8 @@ const LAYERS_ORDER = new Map([
 class PDFPageView {
   #annotationMode = AnnotationMode.ENABLE_FORMS;
 
+  #canvasWrapper = null;
+
   #enableHWA = false;
 
   #hasRestrictedScaling = false;
@@ -125,7 +128,13 @@ class PDFPageView {
 
   #loadingId = null;
 
+  #originalViewport = null;
+
   #previousRotation = null;
+
+  #scaleRoundX = 1;
+
+  #scaleRoundY = 1;
 
   #renderError = null;
 
@@ -138,8 +147,6 @@ class PDFPageView {
     initialOptionalContent: true,
     regularAnnotations: true,
   };
-
-  #viewportMap = new WeakMap();
 
   #layers = [null, null, null, null];
 
@@ -190,7 +197,6 @@ class PDFPageView {
     this.annotationLayer = null;
     this.annotationEditorLayer = null;
     this.textLayer = null;
-    this.zoomLayer = null;
     this.xfaLayer = null;
     this.structTreeLayer = null;
     this.drawLayer = null;
@@ -216,6 +222,13 @@ class PDFPageView {
         "--scale-factor",
         this.scale * PixelsPerInch.PDF_TO_CSS_UNITS
       );
+
+      if (this.pageColors?.background) {
+        container?.style.setProperty(
+          "--page-bg-color",
+          this.pageColors.background
+        );
+      }
 
       const { optionalContentConfigPromise } = options;
       if (optionalContentConfigPromise) {
@@ -383,9 +396,13 @@ class PDFPageView {
   async #renderAnnotationLayer() {
     let error = null;
     try {
-      await this.annotationLayer.render(this.viewport, "display");
+      await this.annotationLayer.render(
+        this.viewport,
+        { structTreeLayer: this.structTreeLayer },
+        "display"
+      );
     } catch (ex) {
-      console.error(`#renderAnnotationLayer: "${ex}".`);
+      console.error("#renderAnnotationLayer:", ex);
       error = ex;
     } finally {
       this.#dispatchLayerRendered("annotationlayerrendered", error);
@@ -397,7 +414,7 @@ class PDFPageView {
     try {
       await this.annotationEditorLayer.render(this.viewport, "display");
     } catch (ex) {
-      console.error(`#renderAnnotationEditorLayer: "${ex}".`);
+      console.error("#renderAnnotationEditorLayer:", ex);
       error = ex;
     } finally {
       this.#dispatchLayerRendered("annotationeditorlayerrendered", error);
@@ -408,7 +425,7 @@ class PDFPageView {
     try {
       await this.drawLayer.render("display");
     } catch (ex) {
-      console.error(`#renderDrawLayer: "${ex}".`);
+      console.error("#renderDrawLayer:", ex);
     }
   }
 
@@ -424,7 +441,7 @@ class PDFPageView {
         this.#buildXfaTextContentItems(result.textDivs);
       }
     } catch (ex) {
-      console.error(`#renderXfaLayer: "${ex}".`);
+      console.error("#renderXfaLayer:", ex);
       error = ex;
     } finally {
       if (this.xfaLayer?.div) {
@@ -449,7 +466,7 @@ class PDFPageView {
       if (ex instanceof AbortException) {
         return;
       }
-      console.error(`#renderTextLayer: "${ex}".`);
+      console.error("#renderTextLayer:", ex);
       error = ex;
     }
     this.#dispatchLayerRendered("textlayerrendered", error);
@@ -468,16 +485,15 @@ class PDFPageView {
     if (!this.textLayer) {
       return;
     }
-    this.structTreeLayer ||= new StructTreeLayerBuilder();
 
-    const tree = await (!this.structTreeLayer.renderingDone
-      ? this.pdfPage.getStructTree()
-      : null);
-    const treeDom = this.structTreeLayer?.render(tree);
+    const treeDom = await this.structTreeLayer?.render();
     if (treeDom) {
-      // Pause translation when inserting the structTree in the DOM.
       this.l10n.pause();
-      this.canvas?.append(treeDom);
+      this.structTreeLayer?.addElementsToTextLayer();
+      if (this.canvas && treeDom.parentNode !== this.canvas) {
+        // Pause translation when inserting the structTree in the DOM.
+        this.canvas.append(treeDom);
+      }
       this.l10n.resume();
     }
     this.structTreeLayer?.show();
@@ -493,33 +509,23 @@ class PDFPageView {
     this._textHighlighter.enable();
   }
 
-  /**
-   * @private
-   */
-  _resetZoomLayer(removeFromDOM = false) {
-    if (!this.zoomLayer) {
+  #resetCanvas() {
+    const { canvas } = this;
+    if (!canvas) {
       return;
     }
-    const zoomLayerCanvas = this.zoomLayer.firstChild;
-    this.#viewportMap.delete(zoomLayerCanvas);
-    // Zeroing the width and height causes Firefox to release graphics
-    // resources immediately, which can greatly reduce memory consumption.
-    zoomLayerCanvas.width = 0;
-    zoomLayerCanvas.height = 0;
-
-    if (removeFromDOM) {
-      // Note: `ChildNode.remove` doesn't throw if the parent node is undefined.
-      this.zoomLayer.remove();
-    }
-    this.zoomLayer = null;
+    canvas.remove();
+    canvas.width = canvas.height = 0;
+    this.canvas = null;
+    this.#originalViewport = null;
   }
 
   reset({
-    keepZoomLayer = false,
     keepAnnotationLayer = false,
     keepAnnotationEditorLayer = false,
     keepXfaLayer = false,
     keepTextLayer = false,
+    keepCanvasWrapper = false,
   } = {}) {
     this.cancelRendering({
       keepAnnotationLayer,
@@ -532,21 +538,21 @@ class PDFPageView {
     const div = this.div;
 
     const childNodes = div.childNodes,
-      zoomLayerNode = (keepZoomLayer && this.zoomLayer) || null,
       annotationLayerNode =
         (keepAnnotationLayer && this.annotationLayer?.div) || null,
       annotationEditorLayerNode =
         (keepAnnotationEditorLayer && this.annotationEditorLayer?.div) || null,
       xfaLayerNode = (keepXfaLayer && this.xfaLayer?.div) || null,
-      textLayerNode = (keepTextLayer && this.textLayer?.div) || null;
+      textLayerNode = (keepTextLayer && this.textLayer?.div) || null,
+      canvasWrapperNode = (keepCanvasWrapper && this.#canvasWrapper) || null;
     for (let i = childNodes.length - 1; i >= 0; i--) {
       const node = childNodes[i];
       switch (node) {
-        case zoomLayerNode:
         case annotationLayerNode:
         case annotationEditorLayerNode:
         case xfaLayerNode:
         case textLayerNode:
+        case canvasWrapperNode:
           continue;
       }
       node.remove();
@@ -575,16 +581,9 @@ class PDFPageView {
     }
     this.structTreeLayer?.hide();
 
-    if (!zoomLayerNode) {
-      if (this.canvas) {
-        this.#viewportMap.delete(this.canvas);
-        // Zeroing the width and height causes Firefox to release graphics
-        // resources immediately, which can greatly reduce memory consumption.
-        this.canvas.width = 0;
-        this.canvas.height = 0;
-        delete this.canvas;
-      }
-      this._resetZoomLayer();
+    if (!keepCanvasWrapper && this.#canvasWrapper) {
+      this.#canvasWrapper = null;
+      this.#resetCanvas();
     }
   }
 
@@ -594,11 +593,11 @@ class PDFPageView {
     }
     this.#isEditing = isEditing;
     this.reset({
-      keepZoomLayer: true,
       keepAnnotationLayer: true,
       keepAnnotationEditorLayer: true,
       keepXfaLayer: true,
       keepTextLayer: true,
+      keepCanvasWrapper: true,
     });
   }
 
@@ -682,7 +681,6 @@ class PDFPageView {
           this.renderingState !== RenderingStates.FINISHED
         ) {
           this.cancelRendering({
-            keepZoomLayer: true,
             keepAnnotationLayer: true,
             keepAnnotationEditorLayer: true,
             keepXfaLayer: true,
@@ -700,7 +698,6 @@ class PDFPageView {
         }
 
         this.cssTransform({
-          target: this.canvas,
           redrawAnnotationLayer: true,
           redrawAnnotationEditorLayer: true,
           redrawXfaLayer: true,
@@ -722,20 +719,14 @@ class PDFPageView {
         });
         return;
       }
-      if (!this.zoomLayer && !this.canvas.hidden) {
-        this.zoomLayer = this.canvas.parentNode;
-        this.zoomLayer.style.position = "absolute";
-      }
     }
-    if (this.zoomLayer) {
-      this.cssTransform({ target: this.zoomLayer.firstChild });
-    }
+    this.cssTransform({});
     this.reset({
-      keepZoomLayer: true,
       keepAnnotationLayer: true,
       keepAnnotationEditorLayer: true,
       keepXfaLayer: true,
       keepTextLayer: true,
+      keepCanvasWrapper: true,
     });
   }
 
@@ -760,9 +751,6 @@ class PDFPageView {
       this.textLayer.cancel();
       this.textLayer = null;
     }
-    if (this.structTreeLayer && !this.textLayer) {
-      this.structTreeLayer = null;
-    }
     if (
       this.annotationLayer &&
       (!keepAnnotationLayer || !this.annotationLayer.div)
@@ -770,6 +758,9 @@ class PDFPageView {
       this.annotationLayer.cancel();
       this.annotationLayer = null;
       this._annotationCanvasMap = null;
+    }
+    if (this.structTreeLayer && !this.textLayer) {
+      this.structTreeLayer = null;
     }
     if (
       this.annotationEditorLayer &&
@@ -790,41 +781,32 @@ class PDFPageView {
   }
 
   cssTransform({
-    target,
     redrawAnnotationLayer = false,
     redrawAnnotationEditorLayer = false,
     redrawXfaLayer = false,
     redrawTextLayer = false,
     hideTextLayer = false,
   }) {
-    // Scale target (canvas), its wrapper and page container.
-    if (
-      (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING")) &&
-      !(target instanceof HTMLCanvasElement)
-    ) {
-      throw new Error("Expected `target` to be a canvas.");
-    }
-    if (!target.hasAttribute("zooming")) {
-      target.setAttribute("zooming", true);
-      const { style } = target;
-      style.width = style.height = "";
+    const { canvas } = this;
+    if (!canvas) {
+      return;
     }
 
-    const originalViewport = this.#viewportMap.get(target);
+    const originalViewport = this.#originalViewport;
     if (this.viewport !== originalViewport) {
       // The canvas may have been originally rotated; rotate relative to that.
       const relativeRotation =
-        this.viewport.rotation - originalViewport.rotation;
-      const absRotation = Math.abs(relativeRotation);
-      let scaleX = 1,
-        scaleY = 1;
-      if (absRotation === 90 || absRotation === 270) {
+        (360 + this.viewport.rotation - originalViewport.rotation) % 360;
+      if (relativeRotation === 90 || relativeRotation === 270) {
         const { width, height } = this.viewport;
         // Scale x and y because of the rotation.
-        scaleX = height / width;
-        scaleY = width / height;
+        const scaleX = height / width;
+        const scaleY = width / height;
+        canvas.style.transform = `rotate(${relativeRotation}deg) scale(${scaleX},${scaleY})`;
+      } else {
+        canvas.style.transform =
+          relativeRotation === 0 ? "" : `rotate(${relativeRotation}deg)`;
       }
-      target.style.transform = `rotate(${relativeRotation}deg) scale(${scaleX}, ${scaleY})`;
     }
 
     if (redrawAnnotationLayer && this.annotationLayer) {
@@ -877,7 +859,6 @@ class PDFPageView {
     this.#renderError = error;
 
     this.renderingState = RenderingStates.FINISHED;
-    this._resetZoomLayer(/* removeFromDOM = */ true);
 
     // Ensure that the thumbnails won't become partially (or fully) blank,
     // for documents that contain interactive form elements.
@@ -912,9 +893,12 @@ class PDFPageView {
 
     // Wrap the canvas so that if it has a CSS transform for high DPI the
     // overflow will be hidden in Firefox.
-    const canvasWrapper = document.createElement("div");
-    canvasWrapper.classList.add("canvasWrapper");
-    this.#addLayer(canvasWrapper, "canvasWrapper");
+    let canvasWrapper = this.#canvasWrapper;
+    if (!canvasWrapper) {
+      canvasWrapper = this.#canvasWrapper = document.createElement("div");
+      canvasWrapper.classList.add("canvasWrapper");
+      this.#addLayer(canvasWrapper, "canvasWrapper");
+    }
 
     if (
       !this.textLayer &&
@@ -989,22 +973,39 @@ class PDFPageView {
     const canvas = document.createElement("canvas");
     canvas.setAttribute("role", "presentation");
 
-    // Keep the canvas hidden until the first draw callback, or until drawing
-    // is complete when `!this.renderingQueue`, to prevent black flickering.
-    canvas.hidden = true;
     const hasHCM = !!(pageColors?.background && pageColors?.foreground);
+    const prevCanvas = this.canvas;
+
+    // In HCM, a final filter is applied on the canvas which means that
+    // before it's applied we've normal colors. Consequently, to avoid to
+    // have a final flash we just display it once all the drawing is done.
+    const updateOnFirstShow = !prevCanvas && !hasHCM;
+    this.canvas = canvas;
+    this.#originalViewport = viewport;
 
     let showCanvas = isLastShow => {
-      // In HCM, a final filter is applied on the canvas which means that
-      // before it's applied we've normal colors. Consequently, to avoid to have
-      // a final flash we just display it once all the drawing is done.
-      if (!hasHCM || isLastShow) {
-        canvas.hidden = false;
-        showCanvas = null; // Only invoke the function once.
+      if (updateOnFirstShow) {
+        // Don't add the canvas until the first draw callback, or until
+        // drawing is complete when `!this.renderingQueue`, to prevent black
+        // flickering.
+        // In whatever case, the canvas must be the first child.
+        canvasWrapper.prepend(canvas);
+        showCanvas = null;
+        return;
       }
+      if (!isLastShow) {
+        return;
+      }
+
+      if (prevCanvas) {
+        prevCanvas.replaceWith(canvas);
+        prevCanvas.width = prevCanvas.height = 0;
+      } else {
+        canvasWrapper.prepend(canvas);
+      }
+
+      showCanvas = null;
     };
-    canvasWrapper.append(canvas);
-    this.canvas = canvas;
 
     const ctx = canvas.getContext("2d", {
       alpha: false,
@@ -1036,14 +1037,27 @@ class PDFPageView {
     const sfx = approximateFraction(outputScale.sx);
     const sfy = approximateFraction(outputScale.sy);
 
-    canvas.width = floorToDivide(width * outputScale.sx, sfx[0]);
-    canvas.height = floorToDivide(height * outputScale.sy, sfy[0]);
-    const { style } = canvas;
-    style.width = floorToDivide(width, sfx[1]) + "px";
-    style.height = floorToDivide(height, sfy[1]) + "px";
+    const canvasWidth = (canvas.width = floorToDivide(
+      calcRound(width * outputScale.sx),
+      sfx[0]
+    ));
+    const canvasHeight = (canvas.height = floorToDivide(
+      calcRound(height * outputScale.sy),
+      sfy[0]
+    ));
+    const pageWidth = floorToDivide(calcRound(width), sfx[1]);
+    const pageHeight = floorToDivide(calcRound(height), sfy[1]);
+    outputScale.sx = canvasWidth / pageWidth;
+    outputScale.sy = canvasHeight / pageHeight;
 
-    // Add the viewport so it's known what it was originally drawn with.
-    this.#viewportMap.set(canvas, viewport);
+    if (this.#scaleRoundX !== sfx[1]) {
+      div.style.setProperty("--scale-round-x", `${sfx[1]}px`);
+      this.#scaleRoundX = sfx[1];
+    }
+    if (this.#scaleRoundY !== sfy[1]) {
+      div.style.setProperty("--scale-round-y", `${sfy[1]}px`);
+      this.#scaleRoundY = sfy[1];
+    }
 
     // Rendering area
     const transform = outputScale.scaled
@@ -1067,6 +1081,11 @@ class PDFPageView {
         showCanvas?.(true);
         await this.#finishRenderTask(renderTask);
 
+        this.structTreeLayer ||= new StructTreeLayerBuilder(
+          pdfPage,
+          viewport.rawDims
+        );
+
         this.#renderTextLayer();
 
         if (this.annotationLayer) {
@@ -1078,27 +1097,25 @@ class PDFPageView {
         if (!annotationEditorUIManager) {
           return;
         }
-
         this.drawLayer ||= new DrawLayerBuilder({
           pageIndex: this.id,
         });
         await this.#renderDrawLayer();
         this.drawLayer.setParent(canvasWrapper);
 
-        if (!this.annotationEditorLayer) {
-          this.annotationEditorLayer = new AnnotationEditorLayerBuilder({
-            uiManager: annotationEditorUIManager,
-            pdfPage,
-            l10n,
-            accessibilityManager: this._accessibilityManager,
-            annotationLayer: this.annotationLayer?.annotationLayer,
-            textLayer: this.textLayer,
-            drawLayer: this.drawLayer.getDrawLayer(),
-            onAppend: annotationEditorLayerDiv => {
-              this.#addLayer(annotationEditorLayerDiv, "annotationEditorLayer");
-            },
-          });
-        }
+        this.annotationEditorLayer ||= new AnnotationEditorLayerBuilder({
+          uiManager: annotationEditorUIManager,
+          pdfPage,
+          l10n,
+          structTreeLayer: this.structTreeLayer,
+          accessibilityManager: this._accessibilityManager,
+          annotationLayer: this.annotationLayer?.annotationLayer,
+          textLayer: this.textLayer,
+          drawLayer: this.drawLayer.getDrawLayer(),
+          onAppend: annotationEditorLayerDiv => {
+            this.#addLayer(annotationEditorLayerDiv, "annotationEditorLayer");
+          },
+        });
         this.#renderAnnotationEditorLayer();
       },
       error => {
@@ -1107,6 +1124,9 @@ class PDFPageView {
         // callback had been invoked at least once.
         if (!(error instanceof RenderingCancelledException)) {
           showCanvas?.(true);
+        } else {
+          prevCanvas?.remove();
+          this.#resetCanvas();
         }
         return this.#finishRenderTask(renderTask, error);
       }

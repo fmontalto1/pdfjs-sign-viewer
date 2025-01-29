@@ -12,7 +12,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/* eslint-env node */
 
 import {
   babelPluginPDFJSPreprocessor,
@@ -81,10 +80,10 @@ const config = JSON.parse(fs.readFileSync(CONFIG_FILE).toString());
 
 const ENV_TARGETS = [
   "last 2 versions",
-  "Chrome >= 98",
+  "Chrome >= 103",
   "Firefox ESR",
   "Safari >= 16.4",
-  "Node >= 18",
+  "Node >= 20",
   "> 1%",
   "not IE > 0",
   "not dead",
@@ -98,7 +97,7 @@ const AUTOPREFIXER_CONFIG = {
 const BABEL_TARGETS = ENV_TARGETS.join(", ");
 
 const BABEL_PRESET_ENV_OPTS = Object.freeze({
-  corejs: "3.37.1",
+  corejs: "3.39.0",
   exclude: ["web.structured-clone"],
   shippedProposals: true,
   useBuiltIns: "usage",
@@ -191,6 +190,8 @@ function createWebpackAlias(defines) {
     "fluent-dom": "node_modules/@fluent/dom/esm/index.js",
   };
   const libraryAlias = {
+    "display-cmap_reader_factory": "src/display/stubs.js",
+    "display-standard_fontdata_factory": "src/display/stubs.js",
     "display-fetch_stream": "src/display/stubs.js",
     "display-network": "src/display/stubs.js",
     "display-node_stream": "src/display/stubs.js",
@@ -219,6 +220,10 @@ function createWebpackAlias(defines) {
   };
 
   if (defines.CHROME) {
+    libraryAlias["display-cmap_reader_factory"] =
+      "src/display/cmap_reader_factory.js";
+    libraryAlias["display-standard_fontdata_factory"] =
+      "src/display/standard_fontdata_factory.js";
     libraryAlias["display-fetch_stream"] = "src/display/fetch_stream.js";
     libraryAlias["display-network"] = "src/display/network.js";
 
@@ -231,6 +236,10 @@ function createWebpackAlias(defines) {
     // Aliases defined here must also be replicated in the paths section of
     // the tsconfig.json file for the type generation to work.
     // In the tsconfig.json files, the .js extension must be omitted.
+    libraryAlias["display-cmap_reader_factory"] =
+      "src/display/cmap_reader_factory.js";
+    libraryAlias["display-standard_fontdata_factory"] =
+      "src/display/standard_fontdata_factory.js";
     libraryAlias["display-fetch_stream"] = "src/display/fetch_stream.js";
     libraryAlias["display-network"] = "src/display/network.js";
     libraryAlias["display-node_stream"] = "src/display/node_stream.js";
@@ -371,8 +380,14 @@ function createWebpackConfig(
     },
     devtool: enableSourceMaps ? "source-map" : undefined,
     module: {
+      parser: {
+        javascript: {
+          importMeta: false,
+        },
+      },
       rules: [
         {
+          test: /\.[mc]?js$/,
           loader: "babel-loader",
           exclude: babelExcludeRegExp,
           options: {
@@ -676,17 +691,21 @@ function runTests(testsName, { bot = false, xfaOnly = false } = {}) {
         if (!bot) {
           args.push("--reftest");
         } else {
-          const os = process.env.OS;
-          if (/windows/i.test(os)) {
-            // The browser-tests are too slow in Google Chrome on the Windows
-            // bot, causing a timeout, hence disabling them for now.
-            forceNoChrome = true;
-          }
+          // The browser-tests are too slow in Google Chrome on the bots,
+          // causing a timeout, hence disabling them for now.
+          forceNoChrome = true;
         }
         if (xfaOnly) {
           args.push("--xfaOnly");
         }
         args.push("--manifestFile=" + PDF_TEST);
+        collectArgs(
+          {
+            names: ["-t", "--testfilter"],
+            hasValue: true,
+          },
+          args
+        );
         break;
       case "unit":
         args.push("--unitTest");
@@ -707,6 +726,9 @@ function runTests(testsName, { bot = false, xfaOnly = false } = {}) {
     if (process.argv.includes("--noChrome") || forceNoChrome) {
       args.push("--noChrome");
     }
+    if (process.argv.includes("--noFirefox")) {
+      args.push("--noFirefox");
+    }
     if (process.argv.includes("--headless")) {
       args.push("--headless");
     }
@@ -721,6 +743,28 @@ function runTests(testsName, { bot = false, xfaOnly = false } = {}) {
   });
 }
 
+function collectArgs(options, args) {
+  if (!Array.isArray(options)) {
+    options = [options];
+  }
+  for (let i = 0, ii = process.argv.length; i < ii; i++) {
+    const arg = process.argv[i];
+    const option = options.find(opt => opt.names.includes(arg));
+    if (!option) {
+      continue;
+    }
+    if (!option.hasValue) {
+      args.push(arg);
+      continue;
+    }
+    const next = process.argv[i + 1];
+    if (next && !next.startsWith("-")) {
+      args.push(arg, next);
+      i += 1;
+    }
+  }
+}
+
 function makeRef(done, bot) {
   console.log();
   console.log("### Creating reference images");
@@ -728,20 +772,28 @@ function makeRef(done, bot) {
   let forceNoChrome = false;
   const args = ["test.mjs", "--masterMode"];
   if (bot) {
-    const os = process.env.OS;
-    if (/windows/i.test(os)) {
-      // The browser-tests are too slow in Google Chrome on the Windows
-      // bot, causing a timeout, hence disabling them for now.
-      forceNoChrome = true;
-    }
+    // The browser-tests are too slow in Google Chrome on the bots,
+    // causing a timeout, hence disabling them for now.
+    forceNoChrome = true;
+
     args.push("--noPrompts", "--strictVerify");
   }
   if (process.argv.includes("--noChrome") || forceNoChrome) {
     args.push("--noChrome");
   }
+  if (process.argv.includes("--noFirefox")) {
+    args.push("--noFirefox");
+  }
   if (process.argv.includes("--headless")) {
     args.push("--headless");
   }
+  collectArgs(
+    {
+      names: ["-t", "--testfilter"],
+      hasValue: true,
+    },
+    args
+  );
 
   const testProcess = startNode(args, { cwd: TEST_DIR, stdio: "inherit" });
   testProcess.on("close", function (code) {
@@ -1101,6 +1153,7 @@ function buildComponents(defines, dir) {
     "web/images/messageBar_*.svg",
     "web/images/toolbarButton-{editorHighlight,menuArrow}.svg",
     "web/images/cursor-*.svg",
+    "web/images/secondaryToolbarButton-documentProperties.svg",
   ];
 
   return ordered([
@@ -1531,6 +1584,8 @@ function buildLibHelper(bundleDefines, inputStream, outputDir) {
     defines: bundleDefines,
     map: {
       "pdfjs-lib": "../pdf.js",
+      "display-cmap_reader_factory": "./cmap_reader_factory.js",
+      "display-standard_fontdata_factory": "./standard_fontdata_factory.js",
       "display-fetch_stream": "./fetch_stream.js",
       "display-network": "./network.js",
       "display-node_stream": "./node_stream.js",
@@ -1897,13 +1952,11 @@ gulp.task(
 
 gulp.task("lint", function (done) {
   console.log();
-  console.log("### Linting JS/CSS/JSON files");
+  console.log("### Linting JS/CSS/JSON/SVG files");
 
   // Ensure that we lint the Firefox specific *.jsm files too.
   const esLintOptions = [
     "node_modules/eslint/bin/eslint",
-    "--ext",
-    ".js,.jsm,.mjs,.json",
     ".",
     "--report-unused-disable-directives",
   ];
@@ -1930,6 +1983,13 @@ gulp.task("lint", function (done) {
     prettierOptions.push("--log-level", "warn", "--check");
   }
 
+  const svgLintOptions = [
+    "node_modules/svglint/bin/cli.js",
+    "**/*.svg",
+    "--ci",
+    "--no-summary",
+  ];
+
   const esLintProcess = startNode(esLintOptions, { stdio: "inherit" });
   esLintProcess.on("close", function (esLintCode) {
     if (esLintCode !== 0) {
@@ -1950,8 +2010,19 @@ gulp.task("lint", function (done) {
           done(new Error("Prettier failed."));
           return;
         }
-        console.log("files checked, no errors found");
-        done();
+
+        const svgLintProcess = startNode(svgLintOptions, {
+          stdio: "inherit",
+        });
+        svgLintProcess.on("close", function (svgLintCode) {
+          if (svgLintCode !== 0) {
+            done(new Error("svglint failed."));
+            return;
+          }
+
+          console.log("files checked, no errors found");
+          done();
+        });
       });
     });
   });
@@ -2180,8 +2251,7 @@ function packageJson() {
     bugs: DIST_BUGS_URL,
     license: DIST_LICENSE,
     optionalDependencies: {
-      canvas: "^2.11.2",
-      path2d: "^0.2.1",
+      "@napi-rs/canvas": "^0.1.65",
     },
     browser: {
       canvas: false,
@@ -2195,7 +2265,7 @@ function packageJson() {
       url: `git+${DIST_GIT_URL}`,
     },
     engines: {
-      node: ">=18",
+      node: ">=20",
     },
     scripts: {},
   };

@@ -59,6 +59,8 @@ See https://github.com/adobe-type-tools/cmap-resources
           "fluent-dom": "../node_modules/@fluent/dom/esm/index.js",
           "cached-iterable": "../node_modules/cached-iterable/src/index.mjs",
 
+          "display-cmap_reader_factory": "../src/display/cmap_reader_factory.js",
+          "display-standard_fontdata_factory": "../src/display/standard_fontdata_factory.js",
           "display-fetch_stream": "../src/display/fetch_stream.js",
           "display-network": "../src/display/network.js",
           "display-node_stream": "../src/display/stubs.js",
@@ -93,13 +95,13 @@ See https://github.com/adobe-type-tools/cmap-resources
 
   </head>
 
-  <body tabindex="1">
+  <body tabindex="0">
     <div id="outerContainer">
 
       <div id="mainContainer">
 
         <div id="floatingToolbar">
-          <button id="download" class="toolbarButton" type="button" title="Download" tabindex="31" data-l10n-id="pdfjs-download-button">
+          <button id="download" class="toolbarButton" type="button" title="Download" tabindex="0" data-l10n-id="pdfjs-download-button">
             <span data-l10n-id="pdfjs-download-button-label">Download</span>
           </button>
         </div>
