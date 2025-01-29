@@ -1893,6 +1893,10 @@ class WidgetAnnotation extends Annotation {
     data.hidden =
       this._hasFlag(data.annotationFlags, AnnotationFlag.HIDDEN) ||
       this._hasFlag(data.annotationFlags, AnnotationFlag.NOVIEW);
+
+    if (data.fieldType === "Sig") {
+      data.isSigned = this._hasSignatureContent(fieldValue);
+    }
   }
 
   /**
@@ -2731,6 +2735,20 @@ class WidgetAnnotation extends Annotation {
 
   getFieldObject() {
     return null;
+  }
+
+  /**
+   * @private
+   * @memberof WidgetAnnotation
+   * @param {any} fieldValue
+   * @returns {boolean}
+   * See Table 252 of ISO 32000 standards defining the core PDF specification.
+   */
+  _hasSignatureContent(fieldValue) {
+    if (fieldValue instanceof Dict) {
+      return Boolean(fieldValue.get("ByteRange") && fieldValue.get("Contents"));
+    }
+    return false;
   }
 }
 
@@ -3726,7 +3744,7 @@ class SignatureWidgetAnnotation extends WidgetAnnotation {
     // to the main-thread (issue 10347).
     this.data.fieldValue = null;
     this.data.hasOwnCanvas = this.data.noRotate;
-    this.data.noHTML = !this.data.hasOwnCanvas;
+    this.data.noHTML = false; // The requirement is that signature annotations must be visible
   }
 
   getFieldObject() {
