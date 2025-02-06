@@ -1166,6 +1166,10 @@ class AnnotationEditorUIManager {
     }
   }
 
+  sizeAnnotations() {
+    return this.#annotationStorage.size;
+  }
+
   #selectionChange() {
     const selection = document.getSelection();
     if (!selection || selection.isCollapsed) {

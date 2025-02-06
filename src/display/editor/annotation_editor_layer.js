@@ -32,6 +32,7 @@ import { HighlightEditor } from "./highlight.js";
 import { InkEditor } from "./ink.js";
 import { setLayerDimensions } from "../display_utils.js";
 import { StampEditor } from "./stamp.js";
+import { SignEditor } from "./sign.js";
 
 /**
  * @typedef {Object} AnnotationEditorLayerOptions
@@ -89,7 +90,7 @@ class AnnotationEditorLayer {
   static _initialized = false;
 
   static #editorTypes = new Map(
-    [FreeTextEditor, InkEditor, StampEditor, HighlightEditor].map(type => [
+    [FreeTextEditor, InkEditor, StampEditor, HighlightEditor, SignEditor].map(type => [
       type._editorType,
       type,
     ])

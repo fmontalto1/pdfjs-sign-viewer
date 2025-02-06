@@ -481,9 +481,9 @@ if (typeof PDFJSDev === "undefined" || !PDFJSDev.test("MOZCENTRAL")) {
     value: null,
     kind: OptionKind.VIEWER
   };
-  defaultOptions.showSignatureWidgetAnnotationEmpty = {
-    /** @type {boolean} */
-    value: true,
+  defaultOptions.signatureAnnotationMode = {
+    /** @type {string} */
+    value: 'READER',
     kind: OptionKind.VIEWER
   };
 }

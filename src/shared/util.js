@@ -78,6 +78,7 @@ const AnnotationEditorType = {
   HIGHLIGHT: 9,
   STAMP: 13,
   INK: 15,
+  SIGN: 20
 };
 
 const AnnotationEditorParamsType = {

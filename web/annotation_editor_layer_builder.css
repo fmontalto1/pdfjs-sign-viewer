@@ -162,7 +162,7 @@
   box-sizing: border-box;
 }
 
-.annotationEditorLayer :is(.freeTextEditor, .inkEditor, .stampEditor) {
+.annotationEditorLayer :is(.freeTextEditor, .inkEditor, .stampEditor, .signEditor) {
   position: absolute;
   background: transparent;
   z-index: 1;
@@ -220,7 +220,7 @@
 }
 
 .annotationEditorLayer
-  :is(.freeTextEditor, .inkEditor, .stampEditor, .highlightEditor),
+  :is(.freeTextEditor, .inkEditor, .stampEditor, .highlightEditor, .signEditor),
 .textLayer {
   .editToolbar {
     --editor-toolbar-delete-image: url(images/editor-toolbar-delete.svg);
@@ -512,7 +512,25 @@
   touch-action: none;
 }
 
+.annotationEditorLayer .signEditor {
+  padding: calc(var(--freetext-padding) * var(--scale-factor));
+  width: auto;
+  height: auto;
+  touch-action: none;
+}
+
 .annotationEditorLayer .freeTextEditor .internal {
+  background: transparent;
+  border: none;
+  inset: 0;
+  overflow: visible;
+  white-space: nowrap;
+  font: 10px sans-serif;
+  line-height: var(--freetext-line-height);
+  user-select: none;
+}
+
+.annotationEditorLayer .signEditor .internal {
   background: transparent;
   border: none;
   inset: 0;
@@ -532,7 +550,20 @@
   height: 100%;
 }
 
-.annotationEditorLayer freeTextEditor .overlay.enabled {
+.annotationEditorLayer .signEditor .overlay {
+  position: absolute;
+  display: none;
+  background: transparent;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.annotationEditorLayer .freeTextEditor .overlay.enabled {
+  display: block;
+}
+
+.annotationEditorLayer .signEditor .overlay.enabled {
   display: block;
 }
 
@@ -541,7 +572,17 @@
   color: gray;
 }
 
+.annotationEditorLayer .signEditor .internal:empty::before {
+  content: attr(default-content);
+  color: gray;
+}
+
 .annotationEditorLayer .freeTextEditor .internal:focus {
+  outline: none;
+  user-select: auto;
+}
+
+.annotationEditorLayer .signEditor .internal:focus {
   outline: none;
   user-select: auto;
 }
@@ -622,7 +663,7 @@
 }
 
 .annotationEditorLayer {
-  :is(.freeTextEditor, .inkEditor, .stampEditor) {
+  :is(.freeTextEditor, .inkEditor, .stampEditor, .signEditor) {
     & > .resizers {
       position: absolute;
       inset: 0;

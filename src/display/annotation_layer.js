@@ -1588,10 +1588,15 @@ class SignatureWidgetAnnotationElement extends WidgetAnnotationElement {
   );
 
   constructor(parameters) {
-    if (
+    if(window?.PDFViewerApplicationOptions?.get(
+      "signatureAnnotationMode"
+    ) === 'EDITOR') {
+      parameters.data.isEditable = true;
+      parameters.data.hasOwnCanvas = true;
+    } else if (
       window?.PDFViewerApplicationOptions?.get(
-        "showSignatureWidgetAnnotationEmpty"
-      ) &&
+        "signatureAnnotationMode"
+      ) === 'READER' &&
       !parameters.data.isSigned &&
       window?.PDFViewerApplicationOptions?.get(
         "viewerFieldParameters"
@@ -1600,6 +1605,7 @@ class SignatureWidgetAnnotationElement extends WidgetAnnotationElement {
       parameters.data.hasOwnCanvas = true;
     }
     super(parameters, { isRenderable: !!parameters.data.hasOwnCanvas });
+    this.annotationEditorType = AnnotationEditorType.SIGN;
     console.log(this.viewerFieldParameters);
   }
 
@@ -1654,6 +1660,7 @@ class SignatureWidgetAnnotationElement extends WidgetAnnotationElement {
     signBox.append(signBoxImg, signerDetail);
     anchorElement.append(signBox);
     this.container.append(anchorElement);
+    this._editOnDoubleClick();
     return this.container;
   }
 }
@@ -3396,4 +3403,5 @@ export {
   HighlightAnnotationElement,
   InkAnnotationElement,
   StampAnnotationElement,
+  SignatureWidgetAnnotationElement
 };

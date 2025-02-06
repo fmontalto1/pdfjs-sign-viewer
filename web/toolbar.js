@@ -41,6 +41,7 @@ import {
  * @property {HTMLButtonElement} editorFreeTextButton - Button to switch to
  *   FreeText editing.
  * @property {HTMLButtonElement} download - Button to download the document.
+ * @property {HTMLButtonElement} editorSignButton - Button to sign
  */
 
 class Toolbar {
@@ -74,6 +75,18 @@ class Toolbar {
             return classList.contains("toggled")
               ? AnnotationEditorType.NONE
               : AnnotationEditorType.FREETEXT;
+          },
+        },
+      },
+      {
+        element: options.editorSignButton,
+        eventName: "switchannotationeditormode",
+        eventDetails: {
+          get mode() {
+            const { classList } = options.editorSignButton;
+            return classList.contains("toggled")
+              ? AnnotationEditorType.NONE
+              : AnnotationEditorType.SIGN;
           },
         },
       },
@@ -116,7 +129,7 @@ class Toolbar {
           type: "editing",
           data: { action: "pdfjs.image.icon_click" },
         },
-      },
+      }
     ];
 
     // Bind the event listeners for click and various other actions.

@@ -349,6 +349,11 @@ class AnnotationFactory {
         continue;
       }
       switch (annotation.annotationType) {
+        case AnnotationEditorType.SIGN:
+          promises.push(
+            SignatureWidgetAnnotation.createNewAnnotation(xref, annotation, changes)
+          );
+          break;
         case AnnotationEditorType.FREETEXT:
           if (!baseFontRef) {
             const baseFont = new Dict(xref);
@@ -2750,6 +2755,30 @@ class WidgetAnnotation extends Annotation {
     }
     return false;
   }
+
+  /**
+   * @public
+   * @memberof WidgetAnnotation
+   * @param {any} xref
+   * @param {any} annotation
+   * @param {any} changes
+   * @param {any} params
+   * @returns {any} annotationRef
+   */
+  static async createNewAnnotation(xref, annotation, changes) {
+    const annotationRef = (annotation.ref ||= xref.getNewTemporaryRef());
+    const annotationDict = this.createNewDict(annotation, xref, {});
+
+    if (Number.isInteger(annotation.parentTreeId)) {
+      annotationDict.set("StructParent", annotation.parentTreeId);
+    }
+
+    changes.put(annotationRef, {
+      data: annotationDict,
+    });
+
+    return { ref: annotationRef };
+  }
 }
 
 class TextWidgetAnnotation extends WidgetAnnotation {
@@ -3755,6 +3784,19 @@ class SignatureWidgetAnnotation extends WidgetAnnotation {
       type: "signature",
     };
   }
+
+  static createNewDict(annotation, xref) {
+    const { rect, value } = annotation;
+    const sign = new Dict(xref);
+    sign.set("Type", Name.get("Annot"));
+    sign.set("Subtype", Name.get("Widget"));
+    sign.set("FT", Name.get("Sig"));
+    sign.set("Rect", rect);
+    sign.set("TU", stringToAsciiOrUTF16BE(value));
+    sign.set("T", stringToAsciiOrUTF16BE(value));
+    return sign;
+  }
+
 }
 
 class TextAnnotation extends MarkupAnnotation {
