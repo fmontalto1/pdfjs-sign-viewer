@@ -1,6 +1,6 @@
 import {
   AnnotationEditorType,
-  assert,
+  assert, getUuid,
   LINE_FACTOR, shadow,
   Util,
 } from "../../shared/util.js";
@@ -17,8 +17,6 @@ import {
 class SignEditor extends AnnotationEditor {
 
   #color;
-
-  #content = "";
 
   #editorDivId = `${this.id}-editor`;
 
@@ -102,6 +100,8 @@ class SignEditor extends AnnotationEditor {
     super({ ...params, name: "signEditor" });
     this.#color = '#000000';
     this.#fontSize = 12;
+    this.height = params.defaultHeight;
+    this.width = params.defaultWidth;
   }
 
   /** @inheritdoc */
@@ -146,7 +146,6 @@ class SignEditor extends AnnotationEditor {
 
   /** @inheritdoc */
   rebuild() {
-    // debugger
     if (!this.parent) {
       return;
     }
@@ -242,7 +241,6 @@ class SignEditor extends AnnotationEditor {
 
   /** @inheritdoc */
   onceAdded(focus) {
-    // debugger
     if (this.width) {
       // The editor was created in using ctrl+c.
       return;
@@ -271,6 +269,7 @@ class SignEditor extends AnnotationEditor {
       this.parent.div.classList.add("signEditing");
     }
     super.remove();
+    this._uiManager.notifyAnnotationEditorRemoved(this);
   }
 
 
@@ -324,13 +323,11 @@ class SignEditor extends AnnotationEditor {
 
   /** @inheritdoc */
   shouldGetKeyboardEvents() {
-    // debugger
     return this.isInEditMode();
   }
 
   /** @inheritdoc */
   enterInEditMode() {
-    // debugger
     this.enableEditMode();
     this.editorDiv.focus();
   }
@@ -340,7 +337,6 @@ class SignEditor extends AnnotationEditor {
    * @param {MouseEvent} event
    */
   dblclick(event) {
-    // debugger
     this.enterInEditMode();
   }
 
@@ -358,27 +354,22 @@ class SignEditor extends AnnotationEditor {
   }
 
   editorDivKeydown(event) {
-    console.log('editorDivKeydown ', event)
     SignEditor._keyboardManager.exec(this, event);
   }
 
   editorDivFocus(event) {
-    console.log('editorDivFocus ', event)
     this.isEditing = true;
   }
 
   editorDivBlur(event) {
-    console.log('editorDivBlur ', event)
     this.isEditing = false;
   }
 
   editorDivInput(event) {
-    console.log('editorDivInput ', event)
     this.parent.div.classList.toggle("signEditing", this.isEmpty());
   }
 
   editorDivPaste(event) {
-    console.log('editorDivPaste ', event)
     this.isEditing = false;
   }
 
@@ -399,66 +390,54 @@ class SignEditor extends AnnotationEditor {
     if (this.div) {
       return this.div;
     }
+
     super.render();
     this.editorDiv = document.createElement("div");
-    this.editorDiv.className = "internal";
+    this.editorDiv.className = "sign-box";
 
     this.editorDiv.setAttribute("id", this.#editorDivId);
     this.editorDiv.setAttribute("data-l10n-id", "pdfjs-free-text2");
     this.editorDiv.setAttribute("data-l10n-attrs", "default-content");
+    if(!this.fieldName) {
+      const uiid = getUuid();
+      this.fieldName = uiid.replaceAll("-", "_");
+    }
 
-    this.#content = "signature".concat('-', this._uiManager.sizeAnnotations() + 1);
-    this.editorDiv.textContent = this.#content;
-    this.editorDiv.style.display = "flex";
-    this.editorDiv.style.justifyContent = "center";
-    this.editorDiv.style.alignItems = "center";
-    this.editorDiv.style.width = "100px";
-    this.editorDiv.style.height = "50px";
-    this.editorDiv.style.backgroundColor = "yellow";
-    this.editorDiv.style.borderRadius = "15px";
-
-    // this.editorDiv = document.createElement("div");
-    // this.editorDiv.setAttribute("data-sign-annotation-id", this.annotationElementId);
-    // this.editorDiv.setAttribute(
-    //   "aria-pressed", "false"
-    // );
-    // this.editorDiv.setAttribute("role", "button");
-    // this.editorDiv.setAttribute("aria-label", "sign button");
-    // this.editorDiv.style.width = "100px";
-    // this.editorDiv.style.height = "50px";
-    // const signBox = document.createElement("div");
-    // signBox.setAttribute("class", "sign-box");
-    // const signBoxImg = document.createElement("div");
-    // signBoxImg.setAttribute("class", "sign-box-img");
-    // const signImage = document.createElement("img");
-    // signImage.src = "assets/pencil.svg";
-    // signImage.setAttribute("aria-hidden", "true");
-    // signImage.setAttribute("focusable", "false");
-    // signImage.setAttribute("class", "sign-img");
-    // const signerDetail = document.createElement("div");
-    // signerDetail.setAttribute("class", "signer-detail");
-    // const signer = document.createElement("p");
-    // signer.setAttribute("class", "signer");
-    // signer.setAttribute("aria-hidden", "true");
-    // signer.textContent = this.#content;
-    // const hint = document.createElement("p");
-    // hint.setAttribute("class", "hint");
-    // signerDetail.append(signer, hint);
-    // signBoxImg.append(signImage);
-    // signBox.append(signBoxImg, signerDetail);
-    // this.editorDiv.append(signBox);
+    this.editorDiv.setAttribute("data-sign-annotation-id", this.fieldName);
+    this.editorDiv.setAttribute(
+      "aria-pressed", "false"
+    );
+    this.editorDiv.setAttribute("role", "button");
+    this.editorDiv.setAttribute("aria-label", "sign button");
+    const signBoxImg = document.createElement("div");
+    signBoxImg.setAttribute("class", "sign-box-img");
+    const signImage = document.createElement("img");
+    signImage.src = "assets/pencil.svg";
+    signImage.setAttribute("aria-hidden", "true");
+    signImage.setAttribute("focusable", "false");
+    signImage.setAttribute("class", "sign-img");
+    const signerDetail = document.createElement("div");
+    signerDetail.setAttribute("class", "signer-detail");
+    const signer = document.createElement("p");
+    signer.setAttribute("class", "signer");
+    signer.setAttribute("aria-hidden", "true");
+    signer.textContent = this.fieldName;
+    const hint = document.createElement("p");
+    hint.setAttribute("class", "hint");
+    signerDetail.append(signer, hint);
+    signBoxImg.append(signImage);
+    this.editorDiv.append(signBoxImg, signerDetail);
 
     this.enableEditing();
-
-    const { style } = this.editorDiv;
-    style.fontSize = `calc(${this.#fontSize}px * var(--scale-factor))`;
-    style.color = this.#color;
 
     this.div.append(this.editorDiv);
 
     this.overlayDiv = document.createElement("div");
     this.overlayDiv.classList.add("overlay", "enabled");
     this.div.append(this.overlayDiv);
+
+    const [parentWidth, parentHeight] = this.parentDimensions;
+    this.setDims(this.width * parentWidth, this.height * parentHeight);
 
     bindEvents(this, this.div, ["dblclick", "keydown"]);
 
@@ -468,17 +447,18 @@ class SignEditor extends AnnotationEditor {
       this.div.setAttribute("annotation-id", this.annotationElementId);
     }
 
+    this._uiManager.addShouldRescale(this);
+
     return this.div;
   }
 
 
   #serializeContent() {
-    return this.#content.replaceAll("\xa0", " ");
+    return this.fieldName.replaceAll("\xa0", " ");
   }
 
   /** @inheritdoc */
   get contentDiv() {
-    // debugger
     return this.editorDiv;
   }
 
@@ -493,6 +473,7 @@ class SignEditor extends AnnotationEditor {
           rotation,
           id,
           popupRef,
+          fieldName
         },
         textContent,
         textPosition,
@@ -513,15 +494,15 @@ class SignEditor extends AnnotationEditor {
         id,
         deleted: false,
         popupRef,
+        fieldName: data.data.fieldName
       };
     }
     const editor = await super.deserialize(data, parent, uiManager);
     editor.#fontSize = data.fontSize;
     editor.#color = Util.makeHexColor(...data.color);
-    editor.#content = data.id || null;
     editor.annotationElementId = data.id || null;
     editor._initialData = initialData;
-
+    editor.fieldName = data.fieldName;
     return editor;
   }
 
@@ -583,8 +564,6 @@ class SignEditor extends AnnotationEditor {
 
   /** @inheritdoc */
   renderAnnotationElement(annotation) {
-
-    // debugger
     const content = super.renderAnnotationElement(annotation);
     if (this.deleted) {
       return content;
@@ -594,7 +573,7 @@ class SignEditor extends AnnotationEditor {
     style.color = this.#color;
 
     content.replaceChildren();
-    for (const line of this.#content.split("\n")) {
+    for (const line of this.fieldName.split("\n")) {
       const div = document.createElement("div");
       div.append(
         line ? document.createTextNode(line) : document.createElement("br")
@@ -605,14 +584,13 @@ class SignEditor extends AnnotationEditor {
     const padding = SignEditor._internalPadding * this.parentScale;
     annotation.updateEdited({
       rect: this.getRect(padding, padding),
-      popupContent: this.#content,
+      popupContent: this.fieldName,
     });
 
     return content;
   }
 
   resetAnnotationElement(annotation) {
-    // debugger
     super.resetAnnotationElement(annotation);
     annotation.resetEdited();
   }
@@ -633,12 +611,25 @@ class SignEditor extends AnnotationEditor {
   /** @inheritdoc */
   _onStopDragging() {
     this.commitOrRemove();
+    this._uiManager.notifyAnnotationEditorChanged(this);
   }
 
   /** @inheritdoc */
   _onResized() {
     this.commitOrRemove();
+    this._uiManager.notifyAnnotationEditorChanged(this);
   }
+
+  /** @inheritdoc */
+  async addEditToolbar() {
+    const toolbar = await super.addEditToolbar();
+    if (!toolbar) {
+      return null;
+    }
+    toolbar.addOptionButton();
+    return toolbar;
+  }
+
 
 }
 

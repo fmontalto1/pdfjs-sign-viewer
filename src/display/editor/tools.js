@@ -1163,6 +1163,7 @@ class AnnotationEditorUIManager {
       !this.#annotationStorage.has(editor.id)
     ) {
       this.#annotationStorage.setValue(editor.id, editor);
+      this.notifyAnnotationEditorAdded(editor);
     }
   }
 
@@ -1776,6 +1777,10 @@ class AnnotationEditorUIManager {
     for (const editorType of this.#editorTypes) {
       editorType.updateDefaultParams(type, value);
     }
+  }
+
+  onAnnotationEditorStatesChanged(evt) {
+    console.log('@@@@ ', evt);
   }
 
   showAllEditors(type, visible, updateButton = false) {
@@ -2517,6 +2522,64 @@ class AnnotationEditorUIManager {
       return;
     }
     editor.renderAnnotationElement(annotation);
+  }
+
+  /**
+   * Called when the editor toolbar option button is clicked.
+   */
+  notifyOptionClicked(editor) {
+    if(!editor) {
+      return;
+    }
+    this._eventBus.dispatch("annotationeditoroptionclicked", {
+      detail: {
+        fieldName: editor.fieldName
+      }
+    });
+  }
+
+  /**
+   * Can be called when an editor it is updated.
+   */
+  notifyAnnotationEditorChanged(editor) {
+    if(!editor) {
+      return;
+    }
+    this._eventBus.dispatch("annotationeditorchanged", {
+      detail: {
+        fieldName: editor.fieldName
+      }
+    });
+  }
+
+  /**
+   * Can be called when an editor it is added.
+   */
+  notifyAnnotationEditorAdded(editor) {
+    if(!editor) {
+      return;
+    }
+    this._eventBus.dispatch("annotationeditoradded", {
+      detail: {
+        fieldName: editor.fieldName,
+        pageIndex: editor.pageIndex,
+        editor
+      }
+    });
+  }
+
+  /**
+   * Can be called when an editor it is removed.
+   */
+  notifyAnnotationEditorRemoved(editor) {
+    if(!editor) {
+      return;
+    }
+    this._eventBus.dispatch("annotationeditorremoved", {
+      detail: {
+        fieldName: editor.fieldName
+      }
+    });
   }
 }
 

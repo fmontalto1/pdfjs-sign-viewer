@@ -262,6 +262,33 @@ async function updateAcroform({
   });
 }
 
+async function updateSignAcroForm({
+xref,
+acroForm,
+acroFormRef,
+changes
+}){
+  let dict;
+  if(!acroForm) {
+    dict = new Dict(xref);
+  } else {
+    dict = acroForm.clone();
+  }
+  dict.set('SigFlags', 1);
+  const fields = [];
+  for (const [ref, { data }] of changes.items()) {
+    const type = data?.get('FT');
+    if(type && type.name === 'Sig') {
+      fields.push(ref);
+    }
+  }
+  dict.set('Fields', fields);
+  changes.put(acroFormRef, {
+    data: dict,
+  });
+
+}
+
 function updateXFA({ xfaData, xfaDatasetsRef, changes, xref }) {
   if (xfaData === null) {
     const datasets = xref.fetchIfRef(xfaDatasetsRef);
@@ -434,6 +461,15 @@ async function incrementalUpdate({
     needAppearances,
     changes,
   });
+
+  if(changes){
+    await updateSignAcroForm({
+      xref,
+      acroForm,
+      acroFormRef,
+      changes
+    });
+  }
 
   if (hasXfa) {
     updateXFA({

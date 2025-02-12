@@ -764,7 +764,14 @@ class AnnotationEditorLayer {
       return;
     }
 
-    this.createAndAddNewEditor(event, /* isCentered = */ false);
+    let data = {};
+
+    if (this.#uiManager.getMode() === AnnotationEditorType.SIGN) {
+      data.defaultWidth = 0.20;
+      data.defaultHeight = 0.04;
+    }
+
+    this.createAndAddNewEditor(event, /* isCentered = */ false, data);
   }
 
   /**

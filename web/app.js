@@ -92,6 +92,7 @@ import { Preferences } from "web-preferences";
 import { SecondaryToolbar } from "web-secondary_toolbar";
 import { Toolbar } from "web-toolbar";
 import { ViewHistory } from "./view_history.js";
+import {SignEditor} from "../src/display/editor/sign.js";
 
 const FORCE_PAGES_LOADED_TIMEOUT = 10000; // ms
 
@@ -2030,6 +2031,27 @@ const PDFViewerApplication = {
         opts
       );
     }
+
+    eventBus._on(
+      "annotationeditoroptionclicked",
+      onAnnotationEditorOptionClicked.bind(this)
+    );
+
+    eventBus._on(
+      "annotationeditoradded",
+      onAnnotationEditorAdded.bind(this)
+    );
+
+    eventBus._on(
+      "annotationeditorchanged",
+      onAnnotationEditorChanged.bind(this)
+    );
+
+    eventBus._on(
+      "annotationeditorremoved",
+      onAnnotationEditorRemoved.bind(this)
+    );
+
   },
 
   bindWindowEvents() {
@@ -2526,6 +2548,22 @@ function onUpdateFindControlState({
   } else {
     this.findBar?.updateUIState(state, previous, matchesCount);
   }
+}
+
+function onAnnotationEditorOptionClicked(evt) {
+  console.log('##### onAnnotationEditorOptionClicked ', evt);
+}
+
+function onAnnotationEditorRemoved(evt) {
+  console.log('@@@@ annotationeditorremoved ', evt);
+}
+
+function onAnnotationEditorChanged(evt) {
+  console.log('@@@@ annotationeditorchanged ', evt);
+}
+
+function onAnnotationEditorAdded(evt) {
+  console.log('@@@@ annotationeditoradded ', evt);
 }
 
 function onScaleChanging(evt) {

@@ -701,6 +701,8 @@ class WorkerMessageHandler {
           };
         }
 
+        const _acroFormRef = buildAcroFormRef(xref, acroFormRef, catalogRef, changes);
+
         return incrementalUpdate({
           originalData: stream.bytes,
           xrefInfo: newXrefInfo,
@@ -710,7 +712,7 @@ class WorkerMessageHandler {
           xfaDatasetsRef,
           hasXfaDatasetsEntry,
           needAppearances,
-          acroFormRef,
+          acroFormRef: _acroFormRef,
           acroForm,
           xfaData,
           // Use the same kind of XRef as the previous one.
@@ -720,6 +722,25 @@ class WorkerMessageHandler {
         });
       }
     );
+
+    function buildAcroFormRef(xref, acroFormRef, catalogRef, changes) {
+      let _acroFormRef;
+      if (!acroFormRef) {
+        const root = pdfManager.catalog.cloneDict();
+        const cache = new RefSetCache();
+        cache.put(catalogRef, root);
+
+        _acroFormRef = xref.getNewTemporaryRef();
+        root.set('AcroForm', _acroFormRef);
+
+        changes.put(catalogRef, {
+          data: root,
+        });
+        return _acroFormRef;
+      } else {
+        return acroFormRef;
+      }
+    }
 
     handler.on("GetOperatorList", function (data, sink) {
       const pageIndex = data.pageIndex;
