@@ -535,7 +535,6 @@
 }
 
 .annotationEditorLayer .signEditor {
-  padding: calc(var(--freetext-padding) * var(--scale-factor));
   width: auto;
   height: auto;
   touch-action: none;

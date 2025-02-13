@@ -1086,6 +1086,18 @@ function getUuid() {
   return bytesToString(buf);
 }
 
+function uuid() {
+  if (
+    (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) ||
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
+  } else {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+
+}
+
 const AnnotationPrefix = "pdfjs_internal_id_";
 
 // TODO: Remove this once `Uint8Array.prototype.toHex` is generally available.
@@ -1188,4 +1200,5 @@ export {
   Util,
   VerbosityLevel,
   warn,
+  uuid
 };

@@ -1,6 +1,6 @@
 import {
   AnnotationEditorType,
-  assert, getUuid,
+  assert, uuid,
   LINE_FACTOR, shadow,
   Util,
 } from "../../shared/util.js";
@@ -399,8 +399,7 @@ class SignEditor extends AnnotationEditor {
     this.editorDiv.setAttribute("data-l10n-id", "pdfjs-free-text2");
     this.editorDiv.setAttribute("data-l10n-attrs", "default-content");
     if(!this.fieldName) {
-      const uiid = getUuid();
-      this.fieldName = uiid.replaceAll("-", "_");
+      this.fieldName = uuid().replaceAll("-", "_");
     }
 
     this.editorDiv.setAttribute("data-sign-annotation-id", this.fieldName);
@@ -446,8 +445,6 @@ class SignEditor extends AnnotationEditor {
     if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("TESTING")) {
       this.div.setAttribute("annotation-id", this.annotationElementId);
     }
-
-    this._uiManager.addShouldRescale(this);
 
     return this.div;
   }
