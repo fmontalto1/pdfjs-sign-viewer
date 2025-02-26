@@ -354,6 +354,11 @@ class AnnotationFactory {
             SignatureWidgetAnnotation.createNewAnnotation(xref, annotation, changes)
           );
           break;
+        case AnnotationEditorType.TEXT:
+          promises.push(
+            TextWidgetAnnotation.createNewAnnotation(xref, annotation, changes)
+          );
+          break;
         case AnnotationEditorType.FREETEXT:
           if (!baseFontRef) {
             const baseFont = new Dict(xref);
@@ -3023,6 +3028,19 @@ class TextWidgetAnnotation extends WidgetAnnotation {
       rotation: this.rotation,
       type: "text",
     };
+  }
+
+  static createNewDict(annotation, xref) {
+    const { rect, value } = annotation;
+    const sign = new Dict(xref);
+    sign.set("Type", Name.get("Annot"));
+    sign.set("Subtype", Name.get("Widget"));
+    sign.set("FT", Name.get("Tx"));
+    sign.set("F", 4);
+    sign.set("Ff", 0);
+    sign.set("Rect", rect);
+    sign.set("T", stringToAsciiOrUTF16BE(value));
+    return sign;
   }
 }
 

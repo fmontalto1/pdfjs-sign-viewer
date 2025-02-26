@@ -2563,7 +2563,7 @@ class AnnotationEditorUIManager {
       detail: {
         fieldName: editor.fieldName,
         pageIndex: editor.pageIndex,
-        editor
+        fieldType: editor.name
       }
     });
   }

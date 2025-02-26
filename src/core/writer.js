@@ -274,14 +274,24 @@ changes
   } else {
     dict = acroForm.clone();
   }
-  dict.set('SigFlags', 1);
+
   const fields = [];
+  let existSigField = false;
   for (const [ref, { data }] of changes.items()) {
     const type = data?.get('FT');
-    if(type && type.name === 'Sig') {
-      fields.push(ref);
+    if(type) {
+      switch (type.name) {
+        case 'Sig':
+          fields.push(ref);
+          existSigField = true;
+          break;
+        case 'Tx':
+          fields.push(ref);
+          break;
+      }
     }
   }
+  dict.set('SigFlags', existSigField ? 1 : 0);
   dict.set('Fields', fields);
   changes.put(acroFormRef, {
     data: dict,

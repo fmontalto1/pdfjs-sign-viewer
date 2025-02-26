@@ -6,7 +6,7 @@ import {
 } from "../../shared/util.js";
 import {AnnotationEditor} from "./editor.js";
 import {
-  SignatureWidgetAnnotationElement
+  CustomTextWidgetAnnotationElement
 } from "../annotation_layer.js";
 import {
   AnnotationEditorUIManager,
@@ -14,7 +14,7 @@ import {
   KeyboardManager
 } from "./tools.js";
 
-class SignEditor extends AnnotationEditor {
+class TextEditor extends AnnotationEditor {
 
   #color;
 
@@ -24,12 +24,12 @@ class SignEditor extends AnnotationEditor {
 
   #fontSize = 8;
 
-  static _type = "signEditor";
+  static _type = "textEditor";
 
-  static _editorType = AnnotationEditorType.SIGN;
+  static _editorType = AnnotationEditorType.TEXT;
 
   static get _keyboardManager() {
-    const proto = SignEditor.prototype;
+    const proto = TextEditor.prototype;
 
     const arrowChecker = self => self.isEmpty();
 
@@ -97,7 +97,7 @@ class SignEditor extends AnnotationEditor {
   }
 
   constructor(params) {
-    super({ ...params, name: "signEditor" });
+    super({ ...params, name: "textEditor" });
     this.#color = '#000000';
     this.#fontSize = 12;
     this.height = params.defaultHeight;
@@ -138,8 +138,8 @@ class SignEditor extends AnnotationEditor {
     // The start of the base line is where the user clicked.
     const scale = this.parentScale;
     return [
-      -SignEditor._internalPadding * scale,
-      -(SignEditor._internalPadding + this.#fontSize) * scale,
+      -TextEditor._internalPadding * scale,
+      -(TextEditor._internalPadding + this.#fontSize) * scale,
     ];
   }
 
@@ -168,7 +168,7 @@ class SignEditor extends AnnotationEditor {
     }
 
     this.parent.setEditingState(false);
-    this.parent.updateToolbar(AnnotationEditorType.SIGN);
+    this.parent.updateToolbar(AnnotationEditorType.TEXT);
     super.enableEditMode();
     this.overlayDiv.classList.remove("enabled");
     this._isDraggable = false;
@@ -225,7 +225,7 @@ class SignEditor extends AnnotationEditor {
 
     // In case the blur callback hasn't been called.
     this.isEditing = false;
-    this.parent.div.classList.add("signEditing");
+    this.parent.div.classList.add("textEditing");
   }
 
   /** @inheritdoc */
@@ -266,7 +266,7 @@ class SignEditor extends AnnotationEditor {
     this.isEditing = false;
     if (this.parent) {
       this.parent.setEditingState(true);
-      this.parent.div.classList.add("signEditing");
+      this.parent.div.classList.add("textEditing");
     }
     super.remove();
     this._uiManager.notifyAnnotationEditorRemoved(this);
@@ -354,7 +354,7 @@ class SignEditor extends AnnotationEditor {
   }
 
   editorDivKeydown(event) {
-    SignEditor._keyboardManager.exec(this, event);
+    TextEditor._keyboardManager.exec(this, event);
   }
 
   editorDivFocus(event) {
@@ -366,7 +366,7 @@ class SignEditor extends AnnotationEditor {
   }
 
   editorDivInput(event) {
-    this.parent.div.classList.toggle("signEditing", this.isEmpty());
+    this.parent.div.classList.toggle("textEditing", this.isEmpty());
   }
 
   editorDivPaste(event) {
@@ -402,12 +402,15 @@ class SignEditor extends AnnotationEditor {
       this.fieldName = uuid().replaceAll("-", "_");
     }
 
-    this.editorDiv.setAttribute("data-sign-annotation-id", this.fieldName);
+    this.editorDiv.setAttribute("data-text-annotation-id", this.fieldName);
     this.editorDiv.setAttribute(
       "aria-pressed", "false"
     );
     this.editorDiv.setAttribute("role", "button");
     this.editorDiv.setAttribute("aria-label", "sign button");
+    // this.editorDiv.style.backgroundColor = "yellow";
+    this.editorDiv.style.borderRadius = "15px";
+
     const signBoxImg = document.createElement("div");
     signBoxImg.setAttribute("class", "sign-box-img");
     const signImage = document.createElement("img");
@@ -420,6 +423,7 @@ class SignEditor extends AnnotationEditor {
     const signer = document.createElement("p");
     signer.setAttribute("class", "signer");
     signer.setAttribute("aria-hidden", "true");
+    // signer.textContent = this.fieldName;
     const hint = document.createElement("p");
     hint.setAttribute("class", "hint");
     signerDetail.append(signer, hint);
@@ -461,15 +465,14 @@ class SignEditor extends AnnotationEditor {
   /** @inheritdoc */
   static async deserialize(data, parent, uiManager) {
     let initialData = null;
-    if (data instanceof SignatureWidgetAnnotationElement) {
+    if (data instanceof CustomTextWidgetAnnotationElement) {
       const {
         data: {
           defaultAppearanceData: { fontSize, fontColor },
           rect,
           rotation,
           id,
-          popupRef,
-          fieldName
+          popupRef
         },
         textContent,
         textPosition,
@@ -479,7 +482,7 @@ class SignEditor extends AnnotationEditor {
       } = data;
 
       initialData = data = {
-        annotationType: AnnotationEditorType.SIGN,
+        annotationType: AnnotationEditorType.TEXT,
         color: Array.from(fontColor),
         fontSize,
         value: textContent?.join("\n"),
@@ -512,7 +515,7 @@ class SignEditor extends AnnotationEditor {
       return this.serializeDeleted();
     }
 
-    const padding = SignEditor._internalPadding * this.parentScale;
+    const padding = TextEditor._internalPadding * this.parentScale;
     const rect = this.getRect(padding, padding);
     const color = AnnotationEditor._colorManager.convert(
       this.isAttachedToDOM
@@ -521,7 +524,7 @@ class SignEditor extends AnnotationEditor {
     );
 
     const serialized = {
-      annotationType: AnnotationEditorType.SIGN,
+      annotationType: AnnotationEditorType.TEXT,
       color,
       fontSize: this.#fontSize,
       value: this.#serializeContent(),
@@ -577,7 +580,7 @@ class SignEditor extends AnnotationEditor {
       content.append(div);
     }
 
-    const padding = SignEditor._internalPadding * this.parentScale;
+    const padding = TextEditor._internalPadding * this.parentScale;
     annotation.updateEdited({
       rect: this.getRect(padding, padding),
       popupContent: this.fieldName,
@@ -629,4 +632,4 @@ class SignEditor extends AnnotationEditor {
 
 }
 
-export { SignEditor };
+export { TextEditor };

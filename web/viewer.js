@@ -70,6 +70,7 @@ function getViewerConfiguration() {
       ),
       download: document.getElementById("downloadButton"),
       editorSignButton: document.getElementById("editorSignButton"),
+      editorTextButton: document.getElementById("editorTextButton"),
     },
     secondaryToolbar: {
       toolbar: document.getElementById("secondaryToolbar"),
