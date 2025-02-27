@@ -35,6 +35,7 @@ class EditorToolbar {
       freetext: "pdfjs-editor-remove-freetext-button",
       highlight: "pdfjs-editor-remove-highlight-button",
       ink: "pdfjs-editor-remove-ink-button",
+      signEditor: "pdfjs-editor-delete-sign-button"
     });
   }
 

@@ -381,8 +381,7 @@ class SignEditor extends AnnotationEditor {
 
   /** @inheritdoc */
   enableEditing() {
-    this.editorDiv.setAttribute("role", "textbox");
-    this.editorDiv.setAttribute("aria-multiline", true);
+    this.editorDiv.setAttribute("role", "button");
   }
 
   /** @inheritdoc */
@@ -397,7 +396,6 @@ class SignEditor extends AnnotationEditor {
 
     this.editorDiv.setAttribute("id", this.#editorDivId);
     this.editorDiv.setAttribute("data-l10n-id", "pdfjs-free-text2");
-    this.editorDiv.setAttribute("data-l10n-attrs", "default-content");
     if(!this.fieldName) {
       this.fieldName = uuid().replaceAll("-", "_");
     }

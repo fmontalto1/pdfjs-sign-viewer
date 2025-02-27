@@ -329,6 +329,10 @@ pdfjs-editor-remove-stamp-button =
 pdfjs-editor-remove-highlight-button =
     .title = Rimuovi evidenziazione
 
+## Option button for the signature editor.
+pdfjs-editor-option-sign-button =
+    .title = Configura
+
 ##
 
 # Editor Parameters

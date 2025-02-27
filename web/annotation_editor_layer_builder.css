@@ -225,7 +225,7 @@
 .textLayer {
   .editToolbar {
     --editor-toolbar-delete-image: url(images/editor-toolbar-delete.svg);
-    --editor-toolbar-option-image: url(images/secondaryToolbarButton-documentProperties.svg);
+    --editor-toolbar-option-image: url(images/editor-toolbar-gear.svg);
     --editor-toolbar-bg-color: #f0f0f4;
     --editor-toolbar-highlight-image: url(images/toolbarButton-editorHighlight.svg);
     --editor-toolbar-fg-color: #2e2e56;
