@@ -699,9 +699,9 @@ class AnnotationEditor {
   setDims(width, height) {
     const [parentWidth, parentHeight] = this.parentDimensions;
     const { style } = this.div;
-    style.width = `${((100 * width) / parentWidth)}%`;
+    style.width = `${(100 * width) / parentWidth}%`;
     if (!this.#keepAspectRatio) {
-      style.height = `${((100 * height) / parentHeight)}%`;
+      style.height = `${(100 * height) / parentHeight}%`;
     }
   }
 
