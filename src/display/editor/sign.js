@@ -134,17 +134,6 @@ class SignEditor extends AnnotationEditor {
   }
 
   /** @inheritdoc */
-  getInitialTranslation() {
-    // The start of the base line is where the user clicked.
-    const scale = this.parentScale;
-    return [
-      -SignEditor._internalPadding * scale,
-      -(SignEditor._internalPadding + this.#fontSize) * scale,
-    ];
-  }
-
-
-  /** @inheritdoc */
   rebuild() {
     if (!this.parent) {
       return;
@@ -304,6 +293,13 @@ class SignEditor extends AnnotationEditor {
       this.height = rect.width / parentHeight;
     }
     this.fixAndSetPosition();
+  }
+
+  /** @inheritdoc */
+  getBaseTranslation() {
+    // The editor itself doesn't have any CSS border (we're drawing one
+    // ourselves in using SVG).
+    return [0, 0];
   }
 
   /**

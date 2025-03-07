@@ -134,15 +134,11 @@ class TextEditor extends AnnotationEditor {
   }
 
   /** @inheritdoc */
-  getInitialTranslation() {
-    // The start of the base line is where the user clicked.
-    const scale = this.parentScale;
-    return [
-      -TextEditor._internalPadding * scale,
-      -(TextEditor._internalPadding + this.#fontSize) * scale,
-    ];
+  getBaseTranslation() {
+    // The editor itself doesn't have any CSS border (we're drawing one
+    // ourselves in using SVG).
+    return [0, 0];
   }
-
 
   /** @inheritdoc */
   rebuild() {
