@@ -1588,15 +1588,15 @@ class CustomTextWidgetAnnotationElement extends TextWidgetAnnotationElement {
   );
 
   constructor(parameters) {
-    if(window?.PDFViewerApplicationOptions?.get(
-      "signatureAnnotationMode"
-    ) === 'EDITOR') {
+    if (
+      window?.PDFViewerApplicationOptions?.get("signatureAnnotationMode") ===
+      "EDITOR"
+    ) {
       parameters.data.isEditable = true;
       parameters.data.hasOwnCanvas = true;
     } else if (
-      window?.PDFViewerApplicationOptions?.get(
-        "signatureAnnotationMode"
-      ) === 'READER' &&
+      window?.PDFViewerApplicationOptions?.get("signatureAnnotationMode") ===
+        "READER" &&
       !parameters.data.isSigned &&
       window?.PDFViewerApplicationOptions?.get(
         "viewerFieldParameters"
@@ -1607,7 +1607,6 @@ class CustomTextWidgetAnnotationElement extends TextWidgetAnnotationElement {
     super(parameters, { isRenderable: !!parameters.data.hasOwnCanvas });
 
     this.annotationEditorType = AnnotationEditorType.TEXT;
-    console.log(this.viewerFieldParameters);
   }
 
   render() {
@@ -1672,15 +1671,15 @@ class SignatureWidgetAnnotationElement extends WidgetAnnotationElement {
   );
 
   constructor(parameters) {
-    if(window?.PDFViewerApplicationOptions?.get(
-      "signatureAnnotationMode"
-    ) === 'EDITOR') {
+    if (
+      window?.PDFViewerApplicationOptions?.get("signatureAnnotationMode") ===
+      "EDITOR"
+    ) {
       parameters.data.isEditable = true;
       parameters.data.hasOwnCanvas = true;
     } else if (
-      window?.PDFViewerApplicationOptions?.get(
-        "signatureAnnotationMode"
-      ) === 'READER' &&
+      window?.PDFViewerApplicationOptions?.get("signatureAnnotationMode") ===
+        "READER" &&
       !parameters.data.isSigned &&
       window?.PDFViewerApplicationOptions?.get(
         "viewerFieldParameters"
@@ -1690,7 +1689,6 @@ class SignatureWidgetAnnotationElement extends WidgetAnnotationElement {
     }
     super(parameters, { isRenderable: !!parameters.data.hasOwnCanvas });
     this.annotationEditorType = AnnotationEditorType.SIGN;
-    console.log(this.viewerFieldParameters);
   }
 
   render() {
@@ -3483,10 +3481,10 @@ class AnnotationLayer {
 
 export {
   AnnotationLayer,
+  CustomTextWidgetAnnotationElement,
   FreeTextAnnotationElement,
   HighlightAnnotationElement,
   InkAnnotationElement,
-  StampAnnotationElement,
   SignatureWidgetAnnotationElement,
-  CustomTextWidgetAnnotationElement
+  StampAnnotationElement,
 };

@@ -1779,9 +1779,7 @@ class AnnotationEditorUIManager {
     }
   }
 
-  onAnnotationEditorStatesChanged(evt) {
-    console.log('@@@@ ', evt);
-  }
+  onAnnotationEditorStatesChanged(evt) {}
 
   showAllEditors(type, visible, updateButton = false) {
     for (const editor of this.#allEditors.values()) {
@@ -2528,13 +2526,13 @@ class AnnotationEditorUIManager {
    * Called when the editor toolbar option button is clicked.
    */
   notifyOptionClicked(editor) {
-    if(!editor) {
+    if (!editor) {
       return;
     }
     this._eventBus.dispatch("annotationeditoroptionclicked", {
       detail: {
-        fieldName: editor.fieldName
-      }
+        fieldName: editor.fieldName,
+      },
     });
   }
 
@@ -2542,13 +2540,13 @@ class AnnotationEditorUIManager {
    * Can be called when an editor it is updated.
    */
   notifyAnnotationEditorChanged(editor) {
-    if(!editor) {
+    if (!editor) {
       return;
     }
     this._eventBus.dispatch("annotationeditorchanged", {
       detail: {
-        fieldName: editor.fieldName
-      }
+        fieldName: editor.fieldName,
+      },
     });
   }
 
@@ -2556,15 +2554,15 @@ class AnnotationEditorUIManager {
    * Can be called when an editor it is added.
    */
   notifyAnnotationEditorAdded(editor) {
-    if(!editor) {
+    if (!editor) {
       return;
     }
     this._eventBus.dispatch("annotationeditoradded", {
       detail: {
         fieldName: editor.fieldName,
         pageIndex: editor.pageIndex,
-        fieldType: editor.name
-      }
+        fieldType: editor.name,
+      },
     });
   }
 
@@ -2572,13 +2570,13 @@ class AnnotationEditorUIManager {
    * Can be called when an editor it is removed.
    */
   notifyAnnotationEditorRemoved(editor) {
-    if(!editor) {
+    if (!editor) {
       return;
     }
     this._eventBus.dispatch("annotationeditorremoved", {
       detail: {
-        fieldName: editor.fieldName
-      }
+        fieldName: editor.fieldName,
+      },
     });
   }
 }

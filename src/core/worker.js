@@ -701,7 +701,12 @@ class WorkerMessageHandler {
           };
         }
 
-        const _acroFormRef = buildAcroFormRef(xref, acroFormRef, catalogRef, changes);
+        const _acroFormRef = buildAcroFormRef(
+          xref,
+          acroFormRef,
+          catalogRef,
+          changes
+        );
 
         return incrementalUpdate({
           originalData: stream.bytes,
@@ -731,15 +736,14 @@ class WorkerMessageHandler {
         cache.put(catalogRef, root);
 
         _acroFormRef = xref.getNewTemporaryRef();
-        root.set('AcroForm', _acroFormRef);
+        root.set("AcroForm", _acroFormRef);
 
         changes.put(catalogRef, {
           data: root,
         });
         return _acroFormRef;
-      } else {
-        return acroFormRef;
       }
+      return acroFormRef;
     }
 
     handler.on("GetOperatorList", function (data, sink) {

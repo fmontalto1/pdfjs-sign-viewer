@@ -92,7 +92,6 @@ import { Preferences } from "web-preferences";
 import { SecondaryToolbar } from "web-secondary_toolbar";
 import { Toolbar } from "web-toolbar";
 import { ViewHistory } from "./view_history.js";
-import {SignEditor} from "../src/display/editor/sign.js";
 
 const FORCE_PAGES_LOADED_TIMEOUT = 10000; // ms
 
@@ -2037,10 +2036,7 @@ const PDFViewerApplication = {
       onAnnotationEditorOptionClicked.bind(this)
     );
 
-    eventBus._on(
-      "annotationeditoradded",
-      onAnnotationEditorAdded.bind(this)
-    );
+    eventBus._on("annotationeditoradded", onAnnotationEditorAdded.bind(this));
 
     eventBus._on(
       "annotationeditorchanged",
@@ -2051,7 +2047,6 @@ const PDFViewerApplication = {
       "annotationeditorremoved",
       onAnnotationEditorRemoved.bind(this)
     );
-
   },
 
   bindWindowEvents() {
@@ -2550,21 +2545,13 @@ function onUpdateFindControlState({
   }
 }
 
-function onAnnotationEditorOptionClicked(evt) {
-  console.log('##### onAnnotationEditorOptionClicked ', evt);
-}
+function onAnnotationEditorOptionClicked(evt) {}
 
-function onAnnotationEditorRemoved(evt) {
-  console.log('@@@@ annotationeditorremoved ', evt);
-}
+function onAnnotationEditorRemoved(evt) {}
 
-function onAnnotationEditorChanged(evt) {
-  console.log('@@@@ annotationeditorchanged ', evt);
-}
+function onAnnotationEditorChanged(evt) {}
 
-function onAnnotationEditorAdded(evt) {
-  console.log('@@@@ annotationeditoradded ', evt);
-}
+function onAnnotationEditorAdded(evt) {}
 
 function onScaleChanging(evt) {
   this.toolbar?.setPageScale(evt.presetValue, evt.scale);

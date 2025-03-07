@@ -162,7 +162,8 @@
   box-sizing: border-box;
 }
 
-.annotationEditorLayer :is(.freeTextEditor, .inkEditor, .stampEditor, .signEditor, .textEditor) {
+.annotationEditorLayer
+  :is(.freeTextEditor, .inkEditor, .stampEditor, .signEditor, .textEditor) {
   position: absolute;
   background: transparent;
   z-index: 1;
@@ -221,7 +222,14 @@
 }
 
 .annotationEditorLayer
-  :is(.freeTextEditor, .inkEditor, .stampEditor, .highlightEditor, .signEditor, .textEditor),
+  :is(
+    .freeTextEditor,
+    .inkEditor,
+    .stampEditor,
+    .highlightEditor,
+    .signEditor,
+    .textEditor
+  ),
 .textLayer {
   .editToolbar {
     --editor-toolbar-delete-image: url(images/editor-toolbar-delete.svg);

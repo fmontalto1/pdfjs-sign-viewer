@@ -79,7 +79,7 @@ const AnnotationEditorType = {
   STAMP: 13,
   INK: 15,
   SIGN: 20,
-  TEXT: 30
+  TEXT: 30,
 };
 
 const AnnotationEditorParamsType = {
@@ -1093,10 +1093,8 @@ function uuid() {
     typeof crypto.randomUUID === "function"
   ) {
     return crypto.randomUUID();
-  } else {
-    return Date.now().toString(36) + Math.random().toString(36).substring(2);
   }
-
+  return Date.now().toString(36) + Math.random().toString(36).substring(2);
 }
 
 const AnnotationPrefix = "pdfjs_internal_id_";
@@ -1199,7 +1197,7 @@ export {
   unreachable,
   utf8StringToString,
   Util,
+  uuid,
   VerbosityLevel,
   warn,
-  uuid
 };

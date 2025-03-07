@@ -31,9 +31,9 @@ import { FreeTextEditor } from "./freetext.js";
 import { HighlightEditor } from "./highlight.js";
 import { InkEditor } from "./ink.js";
 import { setLayerDimensions } from "../display_utils.js";
-import { StampEditor } from "./stamp.js";
 import { SignEditor } from "./sign.js";
-import {TextEditor} from "./text.js";
+import { StampEditor } from "./stamp.js";
+import { TextEditor } from "./text.js";
 
 /**
  * @typedef {Object} AnnotationEditorLayerOptions
@@ -91,10 +91,14 @@ class AnnotationEditorLayer {
   static _initialized = false;
 
   static #editorTypes = new Map(
-    [FreeTextEditor, InkEditor, StampEditor, HighlightEditor, SignEditor, TextEditor].map(type => [
-      type._editorType,
-      type,
-    ])
+    [
+      FreeTextEditor,
+      InkEditor,
+      StampEditor,
+      HighlightEditor,
+      SignEditor,
+      TextEditor,
+    ].map(type => [type._editorType, type])
   );
 
   /**
@@ -765,10 +769,13 @@ class AnnotationEditorLayer {
       return;
     }
 
-    let data = {};
+    const data = {};
 
-    if (this.#uiManager.getMode() === AnnotationEditorType.SIGN || this.#uiManager.getMode() === AnnotationEditorType.TEXT) {
-      data.defaultWidth = 0.20;
+    if (
+      this.#uiManager.getMode() === AnnotationEditorType.SIGN ||
+      this.#uiManager.getMode() === AnnotationEditorType.TEXT
+    ) {
+      data.defaultWidth = 0.2;
       data.defaultHeight = 0.04;
     }
 

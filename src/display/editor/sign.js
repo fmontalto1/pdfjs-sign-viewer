@@ -1,21 +1,20 @@
 import {
   AnnotationEditorType,
-  assert, uuid,
-  LINE_FACTOR, shadow,
+  assert,
+  LINE_FACTOR,
+  shadow,
   Util,
+  uuid,
 } from "../../shared/util.js";
-import {AnnotationEditor} from "./editor.js";
-import {
-  SignatureWidgetAnnotationElement
-} from "../annotation_layer.js";
 import {
   AnnotationEditorUIManager,
   bindEvents,
-  KeyboardManager
+  KeyboardManager,
 } from "./tools.js";
+import { AnnotationEditor } from "./editor.js";
+import { SignatureWidgetAnnotationElement } from "../annotation_layer.js";
 
 class SignEditor extends AnnotationEditor {
-
   #color;
 
   #editorDivId = `${this.id}-editor`;
@@ -98,7 +97,7 @@ class SignEditor extends AnnotationEditor {
 
   constructor(params) {
     super({ ...params, name: "signEditor" });
-    this.#color = '#000000';
+    this.#color = "#000000";
     this.#fontSize = 12;
     this.height = params.defaultHeight;
     this.width = params.defaultWidth;
@@ -261,7 +260,6 @@ class SignEditor extends AnnotationEditor {
     this._uiManager.notifyAnnotationEditorRemoved(this);
   }
 
-
   #setEditorDimensions() {
     const [parentWidth, parentHeight] = this.parentDimensions;
 
@@ -307,7 +305,6 @@ class SignEditor extends AnnotationEditor {
    * @returns {undefined}
    */
   commit() {
-    console.log('Perform commit');
     if (!this.isInEditMode()) {
       return;
     }
@@ -341,7 +338,6 @@ class SignEditor extends AnnotationEditor {
    * @param {KeyboardEvent} event
    */
   keydown(event) {
-    console.log('keydown ', event)
     if (event.target === this.div && event.key === "Enter") {
       this.enterInEditMode();
       // Avoid to add an unwanted new line.
@@ -392,14 +388,12 @@ class SignEditor extends AnnotationEditor {
 
     this.editorDiv.setAttribute("id", this.#editorDivId);
     this.editorDiv.setAttribute("data-l10n-id", "pdfjs-free-text2");
-    if(!this.fieldName) {
+    if (!this.fieldName) {
       this.fieldName = uuid().replaceAll("-", "_");
     }
 
     this.editorDiv.setAttribute("data-sign-annotation-id", this.fieldName);
-    this.editorDiv.setAttribute(
-      "aria-pressed", "false"
-    );
+    this.editorDiv.setAttribute("aria-pressed", "false");
     this.editorDiv.setAttribute("role", "button");
     this.editorDiv.setAttribute("aria-label", "sign button");
     const signBoxImg = document.createElement("div");
@@ -442,7 +436,6 @@ class SignEditor extends AnnotationEditor {
     return this.div;
   }
 
-
   #serializeContent() {
     return this.fieldName.replaceAll("\xa0", " ");
   }
@@ -463,7 +456,6 @@ class SignEditor extends AnnotationEditor {
           rotation,
           id,
           popupRef,
-          fieldName
         },
         textContent,
         textPosition,
@@ -484,7 +476,7 @@ class SignEditor extends AnnotationEditor {
         id,
         deleted: false,
         popupRef,
-        fieldName: data.data.fieldName
+        fieldName: data.data.fieldName,
       };
     }
     const editor = await super.deserialize(data, parent, uiManager);
@@ -619,8 +611,6 @@ class SignEditor extends AnnotationEditor {
     toolbar.addOptionButton();
     return toolbar;
   }
-
-
 }
 
 export { SignEditor };

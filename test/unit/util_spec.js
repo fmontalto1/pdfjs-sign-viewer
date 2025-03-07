@@ -22,7 +22,6 @@ import {
   string32,
   stringToBytes,
   stringToPDFString,
-  uuid
 } from "../../src/shared/util.js";
 
 describe("util", function () {

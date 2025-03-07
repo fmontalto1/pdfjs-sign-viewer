@@ -351,7 +351,11 @@ class AnnotationFactory {
       switch (annotation.annotationType) {
         case AnnotationEditorType.SIGN:
           promises.push(
-            SignatureWidgetAnnotation.createNewAnnotation(xref, annotation, changes)
+            SignatureWidgetAnnotation.createNewAnnotation(
+              xref,
+              annotation,
+              changes
+            )
           );
           break;
         case AnnotationEditorType.TEXT:
@@ -3814,7 +3818,6 @@ class SignatureWidgetAnnotation extends WidgetAnnotation {
     sign.set("T", stringToAsciiOrUTF16BE(value));
     return sign;
   }
-
 }
 
 class TextAnnotation extends MarkupAnnotation {
