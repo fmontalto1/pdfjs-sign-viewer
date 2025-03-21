@@ -854,6 +854,7 @@ class AnnotationEditorUIManager {
       evt => this.updateParams(evt.type, evt.value),
       { signal }
     );
+    eventBus._on("deleteannotation", this.onDeleteAnnotation.bind(this), { signal });
     this.#addSelectionListener();
     this.#addDragAndDropListeners();
     this.#addKeyboardManager();
@@ -881,6 +882,17 @@ class AnnotationEditorUIManager {
           this.#idManager.reset();
         },
       });
+    }
+  }
+
+  onDeleteAnnotation(evt) {
+    if(!evt || !Array.isArray(evt.fieldNames)) {
+      return;
+    }
+    const editors = this.getEditorsByFieldNames(evt.fieldNames);
+    if(editors?.length) {
+      console.log(`Performing delete annotation, number of annotations: ${editors?.length ?? 0}`);
+      editors.forEach(editor => editor.remove());
     }
   }
 
@@ -1846,6 +1858,21 @@ class AnnotationEditorUIManager {
   }
 
   /**
+   * Get all the editors with the given fieldName.
+   * @param {Array<fieldNames>} fileNames
+   * @returns {Array<AnnotationEditor>}
+   */
+  getEditorsByFieldNames(fileNames) {
+    const editors = [];
+    for (const editor of this.#allEditors.values()) {
+      if (fileNames.includes(editor.fieldName)) {
+        editors.push(editor);
+      }
+    }
+    return editors;
+  }
+
+  /**
    * Get all the editors belonging to a given page.
    * @param {number} pageIndex
    * @returns {Array<AnnotationEditor>}
@@ -2562,6 +2589,7 @@ class AnnotationEditorUIManager {
         fieldName: editor.fieldName,
         pageIndex: editor.pageIndex,
         fieldType: editor.name,
+        editor
       },
     });
   }
