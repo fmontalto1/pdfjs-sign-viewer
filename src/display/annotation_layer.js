@@ -90,7 +90,7 @@ class AnnotationElementFactory {
 
         switch (fieldType) {
           case "Tx":
-            return new TextWidgetAnnotationElement(parameters);
+            return new CustomTextWidgetAnnotationElement(parameters);
           case "Btn":
             if (parameters.data.radioButton) {
               return new RadioButtonWidgetAnnotationElement(parameters);
@@ -1582,16 +1582,21 @@ class TextWidgetAnnotationElement extends WidgetAnnotationElement {
   }
 }
 
-class SignatureWidgetAnnotationElement extends WidgetAnnotationElement {
+class CustomTextWidgetAnnotationElement extends TextWidgetAnnotationElement {
   viewerFieldParameters = window?.PDFViewerApplicationOptions?.get(
     "viewerFieldParameters"
   );
 
   constructor(parameters) {
     if (
-      window?.PDFViewerApplicationOptions?.get(
-        "showSignatureWidgetAnnotationEmpty"
-      ) &&
+      window?.PDFViewerApplicationOptions?.get("signatureAnnotationMode") ===
+      "EDITOR"
+    ) {
+      parameters.data.isEditable = true;
+      parameters.data.hasOwnCanvas = true;
+    } else if (
+      window?.PDFViewerApplicationOptions?.get("signatureAnnotationMode") ===
+        "READER" &&
       !parameters.data.isSigned &&
       window?.PDFViewerApplicationOptions?.get(
         "viewerFieldParameters"
@@ -1600,7 +1605,90 @@ class SignatureWidgetAnnotationElement extends WidgetAnnotationElement {
       parameters.data.hasOwnCanvas = true;
     }
     super(parameters, { isRenderable: !!parameters.data.hasOwnCanvas });
-    console.log(this.viewerFieldParameters);
+
+    this.annotationEditorType = AnnotationEditorType.TEXT;
+  }
+
+  render() {
+    const field = this.viewerFieldParameters?.fields.find(
+      f => f.fieldName === this.data.fieldName
+    );
+    const anchorElement = document.createElement("a");
+    anchorElement.setAttribute("data-text-annotation-id", this.data.fieldName);
+    anchorElement.setAttribute(
+      "aria-pressed",
+      field?.pressed?.toString() || "false"
+    );
+    anchorElement.setAttribute("role", "button");
+    anchorElement.setAttribute("aria-label", "sign button");
+    anchorElement.addEventListener("click", () =>
+      anchorElement.dispatchEvent(
+        new CustomEvent("signClick", { detail: this.data.fieldName })
+      )
+    );
+    anchorElement.addEventListener(
+      "signClick",
+      e => {
+        this.linkService.eventBus?.dispatch("signClick", {
+          source: this,
+          detail: this.data.fieldName,
+        });
+      },
+      false
+    );
+    const signBox = document.createElement("div");
+    signBox.setAttribute(
+      "class",
+      field?.pressed ? "sign-box active" : "sign-box"
+    );
+    const signBoxImg = document.createElement("div");
+    signBoxImg.setAttribute("class", "sign-box-img");
+    const signImage = document.createElement("img");
+    signImage.src = field?.pressed ? "assets/sign.svg" : "assets/pencil.svg";
+    signImage.setAttribute("aria-hidden", "true");
+    signImage.setAttribute("focusable", "false");
+    signImage.setAttribute("class", "sign-img");
+    const signerDetail = document.createElement("div");
+    signerDetail.setAttribute("class", "signer-detail");
+    const signer = document.createElement("p");
+    signer.setAttribute("class", "signer");
+    signer.setAttribute("aria-hidden", "true");
+    const hint = document.createElement("p");
+    hint.setAttribute("class", "hint");
+    signerDetail.append(signer, hint);
+    signBoxImg.append(signImage);
+    signBox.append(signBoxImg, signerDetail);
+    anchorElement.append(signBox);
+    this.container.append(anchorElement);
+    this._editOnDoubleClick();
+    return this.container;
+  }
+}
+
+class SignatureWidgetAnnotationElement extends WidgetAnnotationElement {
+  viewerFieldParameters = window?.PDFViewerApplicationOptions?.get(
+    "viewerFieldParameters"
+  );
+
+  constructor(parameters) {
+    if (
+      window?.PDFViewerApplicationOptions?.get("signatureAnnotationMode") ===
+      "EDITOR"
+    ) {
+      parameters.data.isEditable = true;
+      parameters.data.hasOwnCanvas = true;
+    } else if (
+      window?.PDFViewerApplicationOptions?.get("signatureAnnotationMode") ===
+        "READER" &&
+      !parameters.data.isSigned &&
+      window?.PDFViewerApplicationOptions?.get(
+        "viewerFieldParameters"
+      )?.fields.filter(isFieldOnWhiteList(parameters.data.fieldName)).length > 0
+    ) {
+      parameters.data.hasOwnCanvas = true;
+    }
+    super(parameters, { isRenderable: !!parameters.data.hasOwnCanvas });
+    this.annotationEditorType = AnnotationEditorType.SIGN;
   }
 
   render() {
@@ -1654,6 +1742,7 @@ class SignatureWidgetAnnotationElement extends WidgetAnnotationElement {
     signBox.append(signBoxImg, signerDetail);
     anchorElement.append(signBox);
     this.container.append(anchorElement);
+    this._editOnDoubleClick();
     return this.container;
   }
 }
@@ -3392,8 +3481,10 @@ class AnnotationLayer {
 
 export {
   AnnotationLayer,
+  CustomTextWidgetAnnotationElement,
   FreeTextAnnotationElement,
   HighlightAnnotationElement,
   InkAnnotationElement,
+  SignatureWidgetAnnotationElement,
   StampAnnotationElement,
 };

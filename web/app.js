@@ -2030,6 +2030,23 @@ const PDFViewerApplication = {
         opts
       );
     }
+
+    eventBus._on(
+      "annotationeditoroptionclicked",
+      onAnnotationEditorOptionClicked.bind(this)
+    );
+
+    eventBus._on("annotationeditoradded", onAnnotationEditorAdded.bind(this));
+
+    eventBus._on(
+      "annotationeditorchanged",
+      onAnnotationEditorChanged.bind(this)
+    );
+
+    eventBus._on(
+      "annotationeditorremoved",
+      onAnnotationEditorRemoved.bind(this)
+    );
   },
 
   bindWindowEvents() {
@@ -2527,6 +2544,14 @@ function onUpdateFindControlState({
     this.findBar?.updateUIState(state, previous, matchesCount);
   }
 }
+
+function onAnnotationEditorOptionClicked(evt) {}
+
+function onAnnotationEditorRemoved(evt) {}
+
+function onAnnotationEditorChanged(evt) {}
+
+function onAnnotationEditorAdded(evt) {}
 
 function onScaleChanging(evt) {
   this.toolbar?.setPageScale(evt.presetValue, evt.scale);

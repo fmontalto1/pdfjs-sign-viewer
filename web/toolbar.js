@@ -41,6 +41,8 @@ import {
  * @property {HTMLButtonElement} editorFreeTextButton - Button to switch to
  *   FreeText editing.
  * @property {HTMLButtonElement} download - Button to download the document.
+ * @property {HTMLButtonElement} editorSignButton - Button to sign annotation
+ * @property {HTMLButtonElement} editorTextButton - Button to text annotation
  */
 
 class Toolbar {
@@ -74,6 +76,30 @@ class Toolbar {
             return classList.contains("toggled")
               ? AnnotationEditorType.NONE
               : AnnotationEditorType.FREETEXT;
+          },
+        },
+      },
+      {
+        element: options.editorSignButton,
+        eventName: "switchannotationeditormode",
+        eventDetails: {
+          get mode() {
+            const { classList } = options.editorSignButton;
+            return classList.contains("toggled")
+              ? AnnotationEditorType.NONE
+              : AnnotationEditorType.SIGN;
+          },
+        },
+      },
+      {
+        element: options.editorTextButton,
+        eventName: "switchannotationeditormode",
+        eventDetails: {
+          get mode() {
+            const { classList } = options.editorTextButton;
+            return classList.contains("toggled")
+              ? AnnotationEditorType.NONE
+              : AnnotationEditorType.TEXT;
           },
         },
       },

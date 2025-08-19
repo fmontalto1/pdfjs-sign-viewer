@@ -479,12 +479,12 @@ if (typeof PDFJSDev === "undefined" || !PDFJSDev.test("MOZCENTRAL")) {
   defaultOptions.viewerFieldParameters = {
     /** @type {Object} */
     value: null,
-    kind: OptionKind.VIEWER
+    kind: OptionKind.VIEWER,
   };
-  defaultOptions.showSignatureWidgetAnnotationEmpty = {
-    /** @type {boolean} */
-    value: true,
-    kind: OptionKind.VIEWER
+  defaultOptions.signatureAnnotationMode = {
+    /** @type {string} */
+    value: "READER",
+    kind: OptionKind.VIEWER,
   };
 }
 if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {

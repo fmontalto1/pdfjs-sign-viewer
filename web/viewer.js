@@ -69,6 +69,8 @@ function getViewerConfiguration() {
         "editorStampParamsToolbar"
       ),
       download: document.getElementById("downloadButton"),
+      editorSignButton: document.getElementById("editorSignButton"),
+      editorTextButton: document.getElementById("editorTextButton"),
     },
     secondaryToolbar: {
       toolbar: document.getElementById("secondaryToolbar"),
@@ -258,6 +260,7 @@ function webViewerLoad() {
       document.dispatchEvent(event);
     }
   }
+
   PDFViewerApplication.run(config);
 }
 

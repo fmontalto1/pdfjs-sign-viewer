@@ -312,6 +312,7 @@ pdfjs-editor-stamp-button-label = Aggiungi o rimuovi immagine
 pdfjs-editor-highlight-button =
     .title = Evidenzia
 pdfjs-editor-highlight-button-label = Evidenzia
+pdfjs-editor-sign-button-label = Firma
 pdfjs-highlight-floating-button1 =
     .title = Evidenzia
     .aria-label = Evidenzia
@@ -327,6 +328,10 @@ pdfjs-editor-remove-stamp-button =
     .title = Rimuovi immagine
 pdfjs-editor-remove-highlight-button =
     .title = Rimuovi evidenziazione
+
+## Option button for the signature editor.
+pdfjs-editor-option-sign-button =
+    .title = Configura
 
 ##
 

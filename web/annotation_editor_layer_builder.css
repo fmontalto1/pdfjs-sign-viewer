@@ -162,7 +162,8 @@
   box-sizing: border-box;
 }
 
-.annotationEditorLayer :is(.freeTextEditor, .inkEditor, .stampEditor) {
+.annotationEditorLayer
+  :is(.freeTextEditor, .inkEditor, .stampEditor, .signEditor, .textEditor) {
   position: absolute;
   background: transparent;
   z-index: 1;
@@ -171,6 +172,7 @@
   max-width: 100%;
   max-height: 100%;
   border: var(--unfocus-outline);
+  font-size: initial;
 
   &.draggable.selectedEditor {
     cursor: move;
@@ -220,10 +222,18 @@
 }
 
 .annotationEditorLayer
-  :is(.freeTextEditor, .inkEditor, .stampEditor, .highlightEditor),
+  :is(
+    .freeTextEditor,
+    .inkEditor,
+    .stampEditor,
+    .highlightEditor,
+    .signEditor,
+    .textEditor
+  ),
 .textLayer {
   .editToolbar {
     --editor-toolbar-delete-image: url(images/editor-toolbar-delete.svg);
+    --editor-toolbar-option-image: url(images/editor-toolbar-gear.svg);
     --editor-toolbar-bg-color: #f0f0f4;
     --editor-toolbar-highlight-image: url(images/toolbarButton-editorHighlight.svg);
     --editor-toolbar-fg-color: #2e2e56;
@@ -288,6 +298,8 @@
     border: 1px solid var(--editor-toolbar-border-color);
     box-shadow: var(--editor-toolbar-shadow);
 
+    font-size: 0 !important;
+
     &.hidden {
       display: none;
     }
@@ -351,6 +363,25 @@
         &::before {
           content: "";
           mask-image: var(--editor-toolbar-delete-image);
+          mask-repeat: no-repeat;
+          mask-position: center;
+          display: inline-block;
+          background-color: var(--editor-toolbar-fg-color);
+          width: 100%;
+          height: 100%;
+        }
+
+        &:hover::before {
+          background-color: var(--editor-toolbar-hover-fg-color);
+        }
+      }
+
+      .option {
+        width: var(--editor-toolbar-height);
+
+        &::before {
+          content: "";
+          mask-image: var(--editor-toolbar-option-image);
           mask-repeat: no-repeat;
           mask-position: center;
           display: inline-block;
@@ -512,7 +543,41 @@
   touch-action: none;
 }
 
+.annotationEditorLayer .textEditor {
+  width: auto;
+  height: auto;
+  touch-action: none;
+}
+
+.annotationEditorLayer .signEditor {
+  width: auto;
+  height: auto;
+  touch-action: none;
+}
+
 .annotationEditorLayer .freeTextEditor .internal {
+  background: transparent;
+  border: none;
+  inset: 0;
+  overflow: visible;
+  white-space: nowrap;
+  font: 10px sans-serif;
+  line-height: var(--freetext-line-height);
+  user-select: none;
+}
+
+.annotationEditorLayer .textEditor .internal {
+  background: transparent;
+  border: none;
+  inset: 0;
+  overflow: visible;
+  white-space: nowrap;
+  font: 10px sans-serif;
+  line-height: var(--freetext-line-height);
+  user-select: none;
+}
+
+.annotationEditorLayer .signEditor .internal {
   background: transparent;
   border: none;
   inset: 0;
@@ -532,7 +597,33 @@
   height: 100%;
 }
 
-.annotationEditorLayer freeTextEditor .overlay.enabled {
+.annotationEditorLayer .textEditor .overlay {
+  position: absolute;
+  display: none;
+  background: transparent;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.annotationEditorLayer .signEditor .overlay {
+  position: absolute;
+  display: none;
+  background: transparent;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.annotationEditorLayer .freeTextEditor .overlay.enabled {
+  display: block;
+}
+
+.annotationEditorLayer .textEditor .overlay.enabled {
+  display: block;
+}
+
+.annotationEditorLayer .signEditor .overlay.enabled {
   display: block;
 }
 
@@ -541,7 +632,27 @@
   color: gray;
 }
 
+.annotationEditorLayer .textEditor .internal:empty::before {
+  content: attr(default-content);
+  color: gray;
+}
+
+.annotationEditorLayer .signEditor .internal:empty::before {
+  content: attr(default-content);
+  color: gray;
+}
+
 .annotationEditorLayer .freeTextEditor .internal:focus {
+  outline: none;
+  user-select: auto;
+}
+
+.annotationEditorLayer .textEditor .internal:focus {
+  outline: none;
+  user-select: auto;
+}
+
+.annotationEditorLayer .signEditor .internal:focus {
   outline: none;
   user-select: auto;
 }
@@ -622,7 +733,7 @@
 }
 
 .annotationEditorLayer {
-  :is(.freeTextEditor, .inkEditor, .stampEditor) {
+  :is(.freeTextEditor, .inkEditor, .stampEditor, .signEditor, .textEditor) {
     & > .resizers {
       position: absolute;
       inset: 0;

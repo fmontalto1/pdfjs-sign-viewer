@@ -35,7 +35,7 @@ class EditorToolbar {
       freetext: "pdfjs-editor-remove-freetext-button",
       highlight: "pdfjs-editor-remove-highlight-button",
       ink: "pdfjs-editor-remove-ink-button",
-      stamp: "pdfjs-editor-remove-stamp-button",
+      signEditor: "pdfjs-editor-delete-sign-button",
     });
   }
 
@@ -130,6 +130,20 @@ class EditorToolbar {
       },
       { signal: _uiManager._signal }
     );
+    this.#buttons.append(button);
+  }
+
+  addOptionButton() {
+    const { _uiManager } = this.#editor;
+
+    const button = document.createElement("button");
+    button.className = "option";
+    button.tabIndex = 0;
+    button.setAttribute("data-l10n-id", "pdfjs-editor-option-sign-button");
+    this.#addListenersToElement(button);
+    button.addEventListener("click", e => {
+      _uiManager.notifyOptionClicked(this.#editor);
+    });
     this.#buttons.append(button);
   }
 
